@@ -1,12 +1,3 @@
-/*****************************************************************************
- *   A demo example using several of the peripherals on the base board
- *
- *   Copyright(C) 2010, Embedded Artists AB
- *   All rights reserved.
- *
- ******************************************************************************/
-
-
 #include "lpc17xx_pinsel.h"
 #include "lpc17xx_gpio.h"
 #include "lpc17xx_i2c.h"
@@ -22,13 +13,12 @@
 #include "oled.h"
 #include "rgb.h"
 
+#include <stdlib.h>
+
 static uint8_t barPos = 2;
-
-
 
 #define NOTE_PIN_HIGH() GPIO_SetValue(0, 1<<26);
 #define NOTE_PIN_LOW()  GPIO_ClearValue(0, 1<<26);
-
 
 
 static uint32_t notes[] = {
@@ -143,9 +133,335 @@ static uint8_t * song_down = (uint8_t*)"D4,";
 static uint8_t * song_left = (uint8_t*)"E4,";
 static uint8_t * song_right = (uint8_t*)"F4,";
 static uint8_t * song_center = (uint8_t*)"C2.C2,D4,C4,F4,";
+static uint8_t * song = (uint8_t*)"C2.C2,D4,C4,F4,E8,";
+
+static void moveBar(uint8_t steps, uint8_t dir)
+{
+    uint16_t ledOn = 0;
+
+    if (barPos == 0)
+        ledOn = (1 << 0) | (3 << 14);
+    else if (barPos == 1)
+        ledOn = (3 << 0) | (1 << 15);
+    else
+        ledOn = 0x07 << (barPos-2);
+
+    barPos += (dir*steps);
+    barPos = (barPos % 16);
+
+    pca9532_setLeds(ledOn, 0xffff);
+}
+
+static uint8_t ch7seg = '0';
+static void change7Seg(uint8_t rotaryDir)
+{
+
+    if (rotaryDir != ROTARY_WAIT) {
+
+        if (rotaryDir == ROTARY_RIGHT) {
+            ch7seg++;
+        }
+        else {
+            ch7seg--;
+        }
+
+        if (ch7seg > '9')
+            ch7seg = '0';
+        else if (ch7seg < '0')
+            ch7seg = '9';
+
+        led7seg_setChar(ch7seg, FALSE);
+
+    }
+}
+
+static void drawOled(uint8_t joyState)
+{
+    static int wait = 0;
+    static uint8_t currX = 48;
+    static uint8_t currY = 32;
+    static uint8_t lastX = 0;
+    static uint8_t lastY = 0;
+
+    if ((joyState & JOYSTICK_CENTER) != 0) {
+        oled_clearScreen(OLED_COLOR_BLACK);
+        return;
+    }
+
+    if (wait++ < 3)
+        return;
+
+    wait = 0;
+
+    if ((joyState & JOYSTICK_UP) != 0 && currY > 0) {
+        currY--;
+    }
+
+    if ((joyState & JOYSTICK_DOWN) != 0 && currY < OLED_DISPLAY_HEIGHT-1) {
+        currY++;
+    }
+
+    if ((joyState & JOYSTICK_RIGHT) != 0 && currX < OLED_DISPLAY_WIDTH-1) {
+        currX++;
+    }
+
+    if ((joyState & JOYSTICK_LEFT) != 0 && currX > 0) {
+        currX--;
+    }
+
+    if (lastX != currX || lastY != currY) {
+        oled_putPixel(currX, currY, OLED_COLOR_WHITE);
+        lastX = currX;
+        lastY = currY;
+    }
+}
+
+struct Point {
+	uint8_t x;
+	uint8_t y;
+};
+
+struct Fruit {
+	uint8_t x1;
+	uint8_t y1;
+
+	uint8_t x2;
+	uint8_t y2;
+
+	uint8_t x3;
+	uint8_t y3;
+
+	uint8_t x4;
+	uint8_t y4;
+};
 
 
-//C4,F4,E8,C2.C2,
+struct Snake {
+	struct Point* snakeBody;
+	struct Fruit fruit;
+	uint8_t size;
+	uint8_t lastDirection;
+};
+
+
+
+struct Point createPoint(int x, int y) {
+		//uint8_t snakeB[] = {10,32,11,32,12,32,13,32,14,32,15,32};
+	struct Point point;
+	point.x = x;
+	point.y = y;
+	return point;
+}
+
+void clearScreenWithFrame() {
+	oled_clearScreen(OLED_COLOR_BLACK);
+  	for(int i = 0; i < OLED_DISPLAY_HEIGHT-1; i++) {
+   		oled_putPixel(0, i, OLED_COLOR_WHITE);
+   		oled_putPixel(OLED_DISPLAY_WIDTH-1, i, OLED_COLOR_WHITE);
+   	}
+
+   	for(int i = 0; i < OLED_DISPLAY_WIDTH-1; i++) {
+   	   		oled_putPixel(i, 0, OLED_COLOR_WHITE);
+   	   	oled_putPixel(i, OLED_DISPLAY_HEIGHT-1, OLED_COLOR_WHITE);
+   	   	}
+}
+
+
+struct Snake *createSnake(uint8_t size) {
+	//uint8_t size = 5;
+	//uint8_t snakeB[] = {10,32,11,32,12,32,13,32,14,32,15,32};
+	struct Point* snakeBody;
+	snakeBody = malloc(size * sizeof(struct Point));
+	for(int i = 0; i < size; i++) {
+		struct Point p = createPoint(48+i, 50);
+		snakeBody[i] = p;
+	}
+	struct Snake *newSnake;
+	newSnake = malloc(sizeof(struct Snake));
+	newSnake->size = size;
+	newSnake->snakeBody = snakeBody;
+	newSnake->lastDirection = JOYSTICK_UP;
+	struct Fruit f;
+	f.x1 = 30;
+	f.y1 = 30;
+
+	f.x2 = f.x1 + 1;
+	f.y2 = f.y1;
+
+	f.x3 = f.x1;
+	f.y3 = f.y1 + 1;
+
+	f.x4 = f.x1 + 1;
+	f.y4 = f.y1 + 1;
+
+	newSnake->fruit = f;
+
+	return newSnake;
+}
+
+void deleteSnake(struct Snake *s) {
+//	for(int i = 0; i < s->size; i++) {
+//		free(s->snakeBody[i].x);
+//		free(s->snakeBody[i].y);
+//	}
+//	free(s->snakeBody);
+	//free(s->lastDirection);
+//	free(s);
+	int size = 30;
+	s->size = size;
+	struct Point* snakeBody;
+		snakeBody = malloc(size * sizeof(struct Point));
+		for(int i = 0; i < size; i++) {
+			struct Point p = createPoint(48+i, 32);
+			snakeBody[i] = p;
+		}
+//	free(s->snakeBody);
+	s->snakeBody = snakeBody;
+	clearScreenWithFrame();
+}
+
+//napisac funkcje dla stuktury Snake: resize, push, pop, drawStruct, checkCollision
+
+static void drawStruct(struct Snake *s) {
+	if(s->snakeBody[s->size - 1].x < 0 || s->snakeBody[s->size - 1].x > OLED_DISPLAY_WIDTH || s->snakeBody[s->size - 1].y < 0 || s->snakeBody[s->size - 1].y > OLED_DISPLAY_HEIGHT) {
+		s->lastDirection = 99;
+		playSong(song_up);
+	}
+
+	for(int i = 0; i < s->size - 1; i++) {
+		if(s->snakeBody[s->size - 1].x == s->snakeBody[i].x) {
+			if(s->snakeBody[s->size - 1].y == s->snakeBody[i].y) {
+				s->lastDirection = 99;
+				playSong(song_up);
+			}
+		}
+	}
+
+
+
+	for(int i = 0; i < s->size; i++) {
+		oled_putPixel(s->snakeBody[i].x, s->snakeBody[i].y, OLED_COLOR_WHITE);
+	}
+
+	oled_putPixel(s->fruit.x1, s->fruit.y1, OLED_COLOR_WHITE);
+	oled_putPixel(s->fruit.x2, s->fruit.y2, OLED_COLOR_WHITE);
+	oled_putPixel(s->fruit.x3, s->fruit.y3, OLED_COLOR_WHITE);
+	oled_putPixel(s->fruit.x4, s->fruit.y4, OLED_COLOR_WHITE);
+
+}
+
+static void moveSnake(struct Snake *s, uint8_t joyState) { //moving snake without changing direction
+	//struct Point* newBody;
+	//newBody = malloc(s->size * sizeof(struct Point));
+	if(s->lastDirection == 99)
+			return;
+	struct Point snakeHead = s->snakeBody[s->size - 1];
+	struct Point snakeTail = s->snakeBody[0];
+
+
+	oled_putPixel(s->snakeBody[0].x, s->snakeBody[0].y, OLED_COLOR_BLACK);
+
+
+
+	for(int i = 0; i < (s->size - 1); i++) {
+		s->snakeBody[i] = s->snakeBody[i + 1];
+	}
+	//struct Point newPoint = createPoint(lastPoint.x + 1, lastPoint.y);
+	//s->snakeBody[s->size - 1] = newPoint;
+	if((s->lastDirection) == JOYSTICK_RIGHT) {
+		struct Point newPoint = createPoint(snakeHead.x + 1, snakeHead.y);
+		s->snakeBody[s->size - 1] = newPoint;
+//		oled_clearScreen(OLED_COLOR_BLACK);
+
+//		drawStruct(s);
+	} else if((s->lastDirection) == JOYSTICK_LEFT) {
+			struct Point newPoint = createPoint(snakeHead.x - 1, snakeHead.y);
+			s->snakeBody[s->size - 1] = newPoint;
+//			oled_clearScreen(OLED_COLOR_BLACK);
+//			drawStruct(s);
+		} else if((s->lastDirection) == JOYSTICK_UP) {
+			struct Point newPoint = createPoint(snakeHead.x, snakeHead.y-1);
+			s->snakeBody[s->size - 1] = newPoint;
+//			oled_clearScreen(OLED_COLOR_BLACK);
+//			drawStruct(s);
+		} else if((s->lastDirection) == JOYSTICK_DOWN) {
+		struct Point newPoint = createPoint(snakeHead.x, snakeHead.y+1);
+		s->snakeBody[s->size - 1] = newPoint;
+//		oled_clearScreen(OLED_COLOR_BLACK);s
+//		drawStruct(s);
+	} else {
+
+	}
+
+
+	drawStruct(s);
+}
+
+static void drawSnake(uint8_t joyState, uint8_t *lastDirection)
+{
+    static int wait = 0;
+    static uint8_t currX = 48;
+    static uint8_t currY = 32;
+    static uint8_t lastX = 0;
+    static uint8_t lastY = 0;
+    uint8_t currDirection = 0;
+
+    if ( joyState != 0 ) {
+    	currDirection = joyState;
+    } else {
+    	currDirection = *lastDirection;
+    }
+
+    if ((joyState & JOYSTICK_CENTER) != 0) {
+        oled_clearScreen(OLED_COLOR_BLACK);
+        return;
+    }
+
+    if (wait++ < 3)
+        return;
+
+    wait = 0;
+
+    if ((currDirection & JOYSTICK_UP) != 0 && currY > 0) {
+        currY--;
+    }
+
+    if ((currDirection & JOYSTICK_DOWN) != 0 && currY < OLED_DISPLAY_HEIGHT-1) {
+        currY++;
+    }
+
+    if ((currDirection & JOYSTICK_RIGHT) != 0 && currX < OLED_DISPLAY_WIDTH-1) {
+        currX++;
+    }
+
+    if ((currDirection & JOYSTICK_LEFT) != 0 && currX > 0) {
+        currX--;
+    }
+
+    if (lastX != currX || lastY != currY) {
+        oled_putPixel(currX, currY, OLED_COLOR_WHITE);
+        lastX = currX;
+        lastY = currY;
+    }
+    *lastDirection = currDirection;
+}
+
+static void changeRgbLeds(uint32_t value)
+{
+    uint8_t leds = 0;
+
+    leds = value / 128;
+
+    rgb_setLeds(leds);
+}
+
+
+
+
+
+
+
+
         //(uint8_t*)"C2.C2,D4,C4,F4,E8,C2.C2,D4,C4,G4,F8,C2.C2,c4,A4,F4,E4,D4,A2.A2,H4,F4,G4,F8,";
         //"D4,B4,B4,A4,A4,G4,E4,D4.D2,E4,E4,A4,F4,D8.D4,d4,d4,c4,c4,B4,G4,E4.E2,F4,F4,A4,A4,G8,";
 
@@ -258,9 +574,14 @@ int main (void) {
     init_ssp();
     init_adc();
 
+    rotary_init();
+    led7seg_init();
+
     pca9532_init();
     joystick_init();
     acc_init();
+    oled_init();
+    rgb_init();
 
 
     /*
@@ -289,33 +610,103 @@ int main (void) {
 
     /* <---- Speaker ------ */
 
+    moveBar(1, dir);
+    oled_clearScreen(OLED_COLOR_BLACK);
+
+
+    struct Snake *s = createSnake(30);
+   	drawStruct(s);
+   	clearScreenWithFrame();
+
     while (1) {
 
-        state = joystick_read();
-        if (state != 0) {
-        	switch(state) {
-        		case JOYSTICK_CENTER :
-        			playSong(song_center);
-        			break;
-        		case JOYSTICK_UP :
-					playSong(song_up);
-					break;
-        		case JOYSTICK_DOWN :
-					playSong(song_down);
-					break;
-        		case JOYSTICK_LEFT :
-					playSong(song_left);
-					break;
-        		case JOYSTICK_RIGHT :
-					playSong(song_right);
-					break;
-        	}
+        /* ####### Accelerometer and LEDs  ###### */
+        /* # */
+//    	moveSnake(s);
+//    	if(i == 5) s->lastDirection = JOYSTICK_DOWN;
+//    	if(i == 10) s->lastDirection = JOYSTICK_RIGHT;
+//    	if(i == 15) s->lastDirection = JOYSTICK_UP;
+    	Timer0_Wait(50);
+        acc_read(&x, &y, &z);
+        x = x+xoff;
+        y = y+yoff;
+        z = z+zoff;
 
-
-
+        if (y < 0) {
+            dir = 1;
+            y = -y;
         }
+        else {
+            dir = -1;
+        }
+
+        y *= 5;
+        if (y > 1 && wait++ > (40 / (1 + (y/10)))) {
+            moveBar(1, dir);
+            wait = 0;
+        }
+
+        /* # */
+        /* ############################################ */
+
+
+        /* ####### Rotary and 7-segment display  ###### */
+        /* # */
+
+        change7Seg(rotary_read());
+
+        /* # */
+        /* ############################################# */
+
+
+        /* ####### Joystick and OLED  ###### */
+        /* # */
+        state = joystick_read();
+        if (state == JOYSTICK_LEFT || state == JOYSTICK_RIGHT || state == JOYSTICK_UP || state == JOYSTICK_DOWN) {
+        	 s->lastDirection = state;
+//        	 moveSnake(s);
+        }
+        moveSnake(s, state);
+        //drawSnake(state, lastDirectionPtr);
+
+
+       // oled_putPixel(currX, currY, OLED_COLOR_WHITE);
+
+
+        /* # */
+        /* ############################################# */
+
+        btn1 = ((GPIO_ReadValue(0) >> 4) & 0x01);
+
+        /* ############ Trimpot and RGB LED  ########### */
+        /* # */
+
+
+		ADC_StartCmd(LPC_ADC,ADC_START_NOW);
+		//Wait conversion complete
+		while (!(ADC_ChannelGetStatus(LPC_ADC,ADC_CHANNEL_0,ADC_DATA_DONE)));
+		trim = ADC_ChannelGetData(LPC_ADC,ADC_CHANNEL_0);
+
+        changeRgbLeds(trim);
+
+
+        /* # */
+        /* ############################################# */
+
+
+
+        if (btn1 == 0) {
+        	playSong(song_down);
+        	clearScreenWithFrame();
+        	free(s);
+        	s = createSnake(30);
+        }
+
+
         Timer0_Wait(1);
     }
+
+    deleteSnake(s);
 
 
 }
