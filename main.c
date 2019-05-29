@@ -12,10 +12,18 @@
 #include "led7seg.h"
 #include "oled.h"
 #include "rgb.h"
+#include "light.h"
 
 #include <stdlib.h>
 
+
 static uint8_t barPos = 2;
+
+Bool OLED_COLOR = FALSE;
+Bool isCovered = FALSE;
+
+uint32_t seedForSrand = 0;
+
 
 #define NOTE_PIN_HIGH() GPIO_SetValue(0, 1<<26);
 #define NOTE_PIN_LOW()  GPIO_ClearValue(0, 1<<26);
@@ -37,6 +45,11 @@ static uint32_t notes[] = {
         1432, // f - 698 Hz
         1275, // g - 784 Hz
 };
+
+
+
+
+
 
 static void playNote(uint32_t note, uint32_t durationMs) {
 
@@ -152,6 +165,12 @@ static void moveBar(uint8_t steps, uint8_t dir)
     pca9532_setLeds(ledOn, 0xffff);
 }
 
+static void showScore(uint8_t score)
+{
+    pca9532_setLeds(score, 0xffff);
+}
+
+
 static uint8_t ch7seg = '0';
 static void change7Seg(uint8_t rotaryDir)
 {
@@ -184,7 +203,7 @@ static void drawOled(uint8_t joyState)
     static uint8_t lastY = 0;
 
     if ((joyState & JOYSTICK_CENTER) != 0) {
-        oled_clearScreen(OLED_COLOR_BLACK);
+        oled_clearScreen(OLED_COLOR);
         return;
     }
 
@@ -210,7 +229,7 @@ static void drawOled(uint8_t joyState)
     }
 
     if (lastX != currX || lastY != currY) {
-        oled_putPixel(currX, currY, OLED_COLOR_WHITE);
+        oled_putPixel(currX, currY, (uint8_t)(!OLED_COLOR));
         lastX = currX;
         lastY = currY;
     }
@@ -236,11 +255,15 @@ struct Fruit {
 };
 
 
+
+
 struct Snake {
 	struct Point* snakeBody;
 	struct Fruit fruit;
 	uint8_t size;
 	uint8_t lastDirection;
+	Bool isBlocked;
+	uint8_t score;
 };
 
 
@@ -254,15 +277,15 @@ struct Point createPoint(int x, int y) {
 }
 
 void clearScreenWithFrame() {
-	oled_clearScreen(OLED_COLOR_BLACK);
+	oled_clearScreen(OLED_COLOR);
   	for(int i = 0; i < OLED_DISPLAY_HEIGHT-1; i++) {
-   		oled_putPixel(0, i, OLED_COLOR_WHITE);
-   		oled_putPixel(OLED_DISPLAY_WIDTH-1, i, OLED_COLOR_WHITE);
+   		oled_putPixel(0, i, !OLED_COLOR);
+   		oled_putPixel(OLED_DISPLAY_WIDTH-1, i, !OLED_COLOR);
    	}
 
    	for(int i = 0; i < OLED_DISPLAY_WIDTH-1; i++) {
-   	   		oled_putPixel(i, 0, OLED_COLOR_WHITE);
-   	   	oled_putPixel(i, OLED_DISPLAY_HEIGHT-1, OLED_COLOR_WHITE);
+   	   	oled_putPixel(i, 0, !OLED_COLOR);
+   	   	oled_putPixel(i, OLED_DISPLAY_HEIGHT-1, !OLED_COLOR);
    	   	}
 }
 
@@ -282,8 +305,8 @@ struct Snake *createSnake(uint8_t size) {
 	newSnake->snakeBody = snakeBody;
 	newSnake->lastDirection = JOYSTICK_UP;
 	struct Fruit f;
-	f.x1 = 30;
-	f.y1 = 30;
+	f.x1 = 10;
+	f.y1 = 10;
 
 	f.x2 = f.x1 + 1;
 	f.y2 = f.y1;
@@ -296,10 +319,14 @@ struct Snake *createSnake(uint8_t size) {
 
 	newSnake->fruit = f;
 
+	newSnake->isBlocked = TRUE;
+
+	newSnake->score = 0;
+
 	return newSnake;
 }
 
-void deleteSnake(struct Snake *s) {
+void deleteOldSnake(struct Snake *s) {
 //	for(int i = 0; i < s->size; i++) {
 //		free(s->snakeBody[i].x);
 //		free(s->snakeBody[i].y);
@@ -322,33 +349,156 @@ void deleteSnake(struct Snake *s) {
 
 //napisac funkcje dla stuktury Snake: resize, push, pop, drawStruct, checkCollision
 
-static void drawStruct(struct Snake *s) {
-	if(s->snakeBody[s->size - 1].x < 0 || s->snakeBody[s->size - 1].x > OLED_DISPLAY_WIDTH || s->snakeBody[s->size - 1].y < 0 || s->snakeBody[s->size - 1].y > OLED_DISPLAY_HEIGHT) {
-		s->lastDirection = 99;
-		playSong(song_up);
+struct Fruit createFruit(int x, int y) {
+	struct Fruit f;
+	f.x1 = x;
+	f.y1 = y;
+
+	f.x2 = f.x1 + 1;
+	f.y2 = f.y1;
+
+	f.x3 = f.x1;
+	f.y3 = f.y1 + 1;
+
+	f.x4 = f.x1 + 1;
+	f.y4 = f.y1 + 1;
+	return f;
+}
+
+void incSnake(struct Snake *s) {
+	s->size += 1;
+	struct Point* snakeBody2;
+	snakeBody2 = malloc(s->size * sizeof(struct Point));
+	for(int i = 0; i < s->size - 1; i++) {
+		snakeBody2[i] = s->snakeBody[i];
 	}
 
+	struct Point* temp = s->snakeBody;
+	free(temp);
+	s->snakeBody = snakeBody2;
+
+
+	struct Point snakeHead = s->snakeBody[s->size - 2];
+
+	if((s->lastDirection) == JOYSTICK_RIGHT) {
+			struct Point newPoint = createPoint(snakeHead.x + 1, snakeHead.y);
+			s->snakeBody[s->size - 1] = newPoint;
+	//		oled_clearScreen(OLED_COLOR_BLACK);
+
+	//		drawStruct(s);
+		} else if((s->lastDirection) == JOYSTICK_LEFT) {
+				struct Point newPoint = createPoint(snakeHead.x - 1, snakeHead.y);
+				s->snakeBody[s->size - 1] = newPoint;
+	//			oled_clearScreen(OLED_COLOR_BLACK);
+	//			drawStruct(s);
+			} else if((s->lastDirection) == JOYSTICK_UP) {
+				struct Point newPoint = createPoint(snakeHead.x, snakeHead.y-1);
+				s->snakeBody[s->size - 1] = newPoint;
+	//			oled_clearScreen(OLED_COLOR_BLACK);
+	//			drawStruct(s);
+			} else if((s->lastDirection) == JOYSTICK_DOWN) {
+			struct Point newPoint = createPoint(snakeHead.x, snakeHead.y+1);
+			s->snakeBody[s->size - 1] = newPoint;
+			}
+
+}
+
+void eatFruit(struct Snake *s) {
+	uint8_t x = rand() % 92 + 3;
+	uint8_t y = rand() % 44 + 3;
+
+	//Wymaż z ekranu stary owoc
+	oled_putPixel(s->fruit.x1, s->fruit.y1, OLED_COLOR);
+	oled_putPixel(s->fruit.x2, s->fruit.y2, OLED_COLOR);
+	oled_putPixel(s->fruit.x3, s->fruit.y3, OLED_COLOR);
+	oled_putPixel(s->fruit.x4, s->fruit.y4, OLED_COLOR);
+
+	struct Fruit f = createFruit(x, y);
+	s->fruit = f;
+
+	//
+
+	//resize snake!
+//	s->size += 1;
+//	s->snakeBody = realloc(s->snakeBody, s->size);
+//	   if (s->snakeBody) {
+//		   struct Point newPoint = createPoint(s->snakeBody[1].x + 1, s->snakeBody[1].y+1);
+//		   	s->snakeBody[0] = newPoint;
+//	   } else {
+//		 // deal with realloc failing because memory could not be allocated.
+//	   }
+	//
+	s->score += 1;
+	showScore(s->score);
+	incSnake(s);
+	incSnake(s);
+//	playSong(song_up);
+}
+
+static void drawStruct(struct Snake *s) {
+
+	for(int i = 0; i < s->size; i++) {
+		oled_putPixel(s->snakeBody[i].x, s->snakeBody[i].y, !OLED_COLOR);
+	}
+
+	oled_putPixel(s->fruit.x1, s->fruit.y1, !OLED_COLOR);
+	oled_putPixel(s->fruit.x2, s->fruit.y2, !OLED_COLOR);
+	oled_putPixel(s->fruit.x3, s->fruit.y3, !OLED_COLOR);
+	oled_putPixel(s->fruit.x4, s->fruit.y4, !OLED_COLOR);
+
+	//sprawdzanie wystąpienia kolizji ze ścianami
+	if(s->snakeBody[s->size - 1].x <= 1 || s->snakeBody[s->size - 1].x >= OLED_DISPLAY_WIDTH - 1 || s->snakeBody[s->size - 1].y <= 1 || s->snakeBody[s->size - 1].y >= OLED_DISPLAY_HEIGHT - 1) {
+		//blokowanie ruchu
+		s->lastDirection = 99;
+		playSong(song_up);
+		s->isBlocked = TRUE;
+	}
+	//sprawdzenie kolizji z ciałem węża
 	for(int i = 0; i < s->size - 1; i++) {
 		if(s->snakeBody[s->size - 1].x == s->snakeBody[i].x) {
 			if(s->snakeBody[s->size - 1].y == s->snakeBody[i].y) {
 				s->lastDirection = 99;
 				playSong(song_up);
+				s->isBlocked = TRUE;
 			}
 		}
 	}
 
+	//sprawdzanie kolizji z owocami
 
 
-	for(int i = 0; i < s->size; i++) {
-		oled_putPixel(s->snakeBody[i].x, s->snakeBody[i].y, OLED_COLOR_WHITE);
+	if	(	(s->snakeBody[s->size -1].x == s->fruit.x1 && s->snakeBody[s->size -1].y == s->fruit.y1)||
+			(s->snakeBody[s->size -1].x == s->fruit.x2 && s->snakeBody[s->size -1].y == s->fruit.y2)||
+			(s->snakeBody[s->size -1].x == s->fruit.x3 && s->snakeBody[s->size -1].y == s->fruit.y3)||
+			(s->snakeBody[s->size -1].x == s->fruit.x4 && s->snakeBody[s->size -1].y == s->fruit.y4)
+		)
+	{
+		eatFruit(s);
 	}
 
-	oled_putPixel(s->fruit.x1, s->fruit.y1, OLED_COLOR_WHITE);
-	oled_putPixel(s->fruit.x2, s->fruit.y2, OLED_COLOR_WHITE);
-	oled_putPixel(s->fruit.x3, s->fruit.y3, OLED_COLOR_WHITE);
-	oled_putPixel(s->fruit.x4, s->fruit.y4, OLED_COLOR_WHITE);
+
+
 
 }
+
+void checkLightSensor() {
+	  uint32_t light = 0;
+	  light = light_read();
+	  if (light < 25) {
+		  if(OLED_COLOR == FALSE) {
+		        OLED_COLOR = TRUE;
+		        clearScreenWithFrame();
+		  }
+
+	   }
+	  else {
+		  if(OLED_COLOR == TRUE) {
+	        OLED_COLOR = FALSE;
+	        clearScreenWithFrame();
+		  }
+	    }
+}
+
 
 static void moveSnake(struct Snake *s, uint8_t joyState) { //moving snake without changing direction
 	//struct Point* newBody;
@@ -359,7 +509,7 @@ static void moveSnake(struct Snake *s, uint8_t joyState) { //moving snake withou
 	struct Point snakeTail = s->snakeBody[0];
 
 
-	oled_putPixel(s->snakeBody[0].x, s->snakeBody[0].y, OLED_COLOR_BLACK);
+	oled_putPixel(s->snakeBody[0].x, s->snakeBody[0].y, OLED_COLOR);
 
 
 
@@ -397,54 +547,6 @@ static void moveSnake(struct Snake *s, uint8_t joyState) { //moving snake withou
 	drawStruct(s);
 }
 
-static void drawSnake(uint8_t joyState, uint8_t *lastDirection)
-{
-    static int wait = 0;
-    static uint8_t currX = 48;
-    static uint8_t currY = 32;
-    static uint8_t lastX = 0;
-    static uint8_t lastY = 0;
-    uint8_t currDirection = 0;
-
-    if ( joyState != 0 ) {
-    	currDirection = joyState;
-    } else {
-    	currDirection = *lastDirection;
-    }
-
-    if ((joyState & JOYSTICK_CENTER) != 0) {
-        oled_clearScreen(OLED_COLOR_BLACK);
-        return;
-    }
-
-    if (wait++ < 3)
-        return;
-
-    wait = 0;
-
-    if ((currDirection & JOYSTICK_UP) != 0 && currY > 0) {
-        currY--;
-    }
-
-    if ((currDirection & JOYSTICK_DOWN) != 0 && currY < OLED_DISPLAY_HEIGHT-1) {
-        currY++;
-    }
-
-    if ((currDirection & JOYSTICK_RIGHT) != 0 && currX < OLED_DISPLAY_WIDTH-1) {
-        currX++;
-    }
-
-    if ((currDirection & JOYSTICK_LEFT) != 0 && currX > 0) {
-        currX--;
-    }
-
-    if (lastX != currX || lastY != currY) {
-        oled_putPixel(currX, currY, OLED_COLOR_WHITE);
-        lastX = currX;
-        lastY = currY;
-    }
-    *lastDirection = currDirection;
-}
 
 static void changeRgbLeds(uint32_t value)
 {
@@ -548,9 +650,41 @@ static void init_adc(void)
 
 }
 
+void initTimer1() {
+    TIM_TIMERCFG_Type TIM_ConfigStruct;
+    TIM_MATCHCFG_Type TIM_MatchConfigStruct;
+
+// Initialize timer 1, prescale count time of 1ms
+    TIM_ConfigStruct.PrescaleOption = TIM_PRESCALE_USVAL;
+    TIM_ConfigStruct.PrescaleValue = 1000;
+    // use channel 0, MR0
+    TIM_MatchConfigStruct.MatchChannel = 0;
+    // Enable interrupt when MR0 matches the value in TC register
+    TIM_MatchConfigStruct.IntOnMatch = FALSE;
+    //Enable reset on MR0: TIMER will not reset if MR0 matches it
+    TIM_MatchConfigStruct.ResetOnMatch = FALSE;
+    //Stop on MR0 if MR0 matches it
+    TIM_MatchConfigStruct.StopOnMatch = FALSE;
+    //do no thing for external output
+    TIM_MatchConfigStruct.ExtMatchOutputType = TIM_EXTMATCH_NOTHING;
+    // Set Match value, count value is time (timer * 1000uS =timer mS )
+    TIM_MatchConfigStruct.MatchValue = 0xfffffff;
+
+    // Set configuration for Tim_config and Tim_MatchConfig
+    TIM_Init(LPC_TIM1, TIM_TIMER_MODE, &TIM_ConfigStruct);
+    TIM_ConfigMatch(LPC_TIM1, &TIM_MatchConfigStruct);
+    // To start timer 1
+    TIM_Cmd(LPC_TIM1, ENABLE);
+}
+
+uint32_t getTimer1TC() {
+    return LPC_TIM1->TC;
+}
+
 
 int main (void) {
 
+	initTimer1();
 
     int32_t xoff = 0;
     int32_t yoff = 0;
@@ -560,19 +694,15 @@ int main (void) {
 
     int8_t y = 0;
     int8_t z = 0;
-    uint8_t dir = 1;
-    uint8_t wait = 0;
 
-    uint8_t state    = 0;
-
-    uint32_t trim = 0;
+    uint8_t state = 0;
 
     uint8_t btn1 = 0;
 
 
     init_i2c();
     init_ssp();
-    init_adc();
+//    init_adc();
 
     rotary_init();
     led7seg_init();
@@ -581,7 +711,7 @@ int main (void) {
     joystick_init();
     acc_init();
     oled_init();
-    rgb_init();
+//    rgb_init();
 
 
     /*
@@ -610,71 +740,57 @@ int main (void) {
 
     /* <---- Speaker ------ */
 
-    moveBar(1, dir);
-    oled_clearScreen(OLED_COLOR_BLACK);
+    oled_clearScreen(!OLED_COLOR);
 
 
     struct Snake *s = createSnake(30);
-   	drawStruct(s);
    	clearScreenWithFrame();
+   	drawStruct(s);
+   	showScore(s->score);
+   	light_enable();
 
     while (1) {
+    	/*
+    	Funkcjonalności:
+    	- Timer
+    	- OLED
+    	- GPIO (joystick)
+    	- Czujnik światła
+    	- pca9532 (16 diód)
+    	- Akcelerometr
+    	- I2C
+    	- SSP/SPI
+    	- 0.5 - głośnik
+    	TODO
+    	- dac
+    	- głośnik-wav
 
-        /* ####### Accelerometer and LEDs  ###### */
-        /* # */
-//    	moveSnake(s);
-//    	if(i == 5) s->lastDirection = JOYSTICK_DOWN;
-//    	if(i == 10) s->lastDirection = JOYSTICK_RIGHT;
-//    	if(i == 15) s->lastDirection = JOYSTICK_UP;
+
+    	*/
     	Timer0_Wait(50);
         acc_read(&x, &y, &z);
         x = x+xoff;
         y = y+yoff;
         z = z+zoff;
 
-        if (y < 0) {
-            dir = 1;
-            y = -y;
-        }
-        else {
-            dir = -1;
-        }
-
-        y *= 5;
-        if (y > 1 && wait++ > (40 / (1 + (y/10)))) {
-            moveBar(1, dir);
-            wait = 0;
-        }
-
-        /* # */
-        /* ############################################ */
-
-
-        /* ####### Rotary and 7-segment display  ###### */
-        /* # */
-
-        change7Seg(rotary_read());
-
-        /* # */
-        /* ############################################# */
-
-
-        /* ####### Joystick and OLED  ###### */
-        /* # */
         state = joystick_read();
+
+        if(x < -10) {
+        	state = JOYSTICK_RIGHT;
+        } else if(x > 10) {
+        	state = JOYSTICK_LEFT;
+        } else if(y > 10) {
+        	state = JOYSTICK_DOWN;
+        } else if(y < -10) {
+        	state = JOYSTICK_UP;
+        }
+
         if (state == JOYSTICK_LEFT || state == JOYSTICK_RIGHT || state == JOYSTICK_UP || state == JOYSTICK_DOWN) {
         	 s->lastDirection = state;
-//        	 moveSnake(s);
         }
-        moveSnake(s, state);
-        //drawSnake(state, lastDirectionPtr);
-
-
-       // oled_putPixel(currX, currY, OLED_COLOR_WHITE);
-
-
-        /* # */
-        /* ############################################# */
+        if(s->isBlocked == FALSE) {
+        	moveSnake(s, state);
+        }
 
         btn1 = ((GPIO_ReadValue(0) >> 4) & 0x01);
 
@@ -682,31 +798,36 @@ int main (void) {
         /* # */
 
 
-		ADC_StartCmd(LPC_ADC,ADC_START_NOW);
-		//Wait conversion complete
-		while (!(ADC_ChannelGetStatus(LPC_ADC,ADC_CHANNEL_0,ADC_DATA_DONE)));
-		trim = ADC_ChannelGetData(LPC_ADC,ADC_CHANNEL_0);
-
-        changeRgbLeds(trim);
+//		ADC_StartCmd(LPC_ADC,ADC_START_NOW);
+//		//Wait conversion complete
+//		while (!(ADC_ChannelGetStatus(LPC_ADC,ADC_CHANNEL_0,ADC_DATA_DONE)));
+//		trim = ADC_ChannelGetData(LPC_ADC,ADC_CHANNEL_0);
+//
+//        changeRgbLeds(trim);
 
 
         /* # */
         /* ############################################# */
-
-
+        checkLightSensor();
 
         if (btn1 == 0) {
         	playSong(song_down);
         	clearScreenWithFrame();
         	free(s);
         	s = createSnake(30);
+        	s->isBlocked = FALSE;
+        	showScore(0);
+        	if(seedForSrand == 0) {
+        		seedForSrand = getTimer1TC();
+        		srand(seedForSrand);
+        	}
         }
 
 
         Timer0_Wait(1);
     }
 
-    deleteSnake(s);
+    deleteOldSnake(s);
 
 
 }
