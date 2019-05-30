@@ -1,0 +1,117 @@
+\documentclass{classrep}
+\usepackage[utf8]{inputenc}
+\frenchspacing
+
+\usepackage{graphicx}
+\usepackage{subfig}
+\usepackage{float}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage[hidelinks]{hyperref}
+
+\usepackage{amsmath, amssymb, mathtools}
+
+\usepackage{hyperref}
+
+\usepackage{fancyhdr, lastpage}
+\pagestyle{fancyplain}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\cfoot{\thepage\ / \pageref*{LastPage}}
+
+
+\studycycle{Informatyka, studia dzienne, I st.}
+\coursesemester{IV}
+
+\coursename{Inteligentna Analiza Danych}
+\courseyear{2018/2019}
+
+\courseteacher{mgr inż. Paweł Tarasiuk}
+\coursegroup{poniedziałek, 12:15}
+
+\author{%
+	\studentinfo[216782@edu.p.lodz.pl]{Konrad Jaworski}{216782}\\
+	\studentinfo[216866@edu.p.lodz.pl]{Jakub Plich}{216866}%
+}
+
+\title{Zadanie 2.: Perceptron wielowarstwowy i klasyfikacja}
+
+\begin{document}
+	\maketitle
+	\thispagestyle{fancyplain}
+	
+	\section{Cel}
+	{
+		Celem zadania było:
+		\begin{itemize}
+			\item zaimplementowanie oraz zbadanie działania perceptronu wielowarstwowego
+			\item rozwiązanie problemu klasyfikacji przy pomocy różnych klasyfikatorów
+		\end{itemize}
+	}
+	
+	\section{Wprowadzenie}
+	{
+		\subsection{Perceptron wielowarstwowy}
+		Pierwsza część ćwiczenia przed zadaniem 2 zakłada zaimplementowanie perceptronu.
+		Stworzona przez nas implementacja perceptronu jest uniwersalna i pozwala na skalowalność jego architektury. Jako metodę nauki wykorzystuje wsteczną propagacje błędów.
+		Perceptron posiada 2 tryby: nauki i testowania. W trybie nauki perceptron uczony jest metodą z nauczycielem. Sekwencja czynności podczas nauki wygląda następująco: wzorzec 				treningowy podawany jest na wejścia sieci, następnie odbywa się jego propagacja wprzód, dalej na podstawie wartości odpowiedzi wygenerowanej przez sieć oraz wartości 					pożądanego wzorca odpowiedzi następuje wyznaczenie błędów, po czym propagowane są one wstecz, na koniec zaś ma miejsce wprowadzenie poprawek na wagi. Program 					umożliwia dostosowanie wartości współczynników nauki i momentum. Czas nauki określony jest przez liczbę epok lub wielkość błędu.
+				
+		W trybie testowania wyznaczane są odpowiedzi sieci dla poszczególnych wzorców, natomiast nauka, a więc modyfikacja wag, nie zachodzi.\\\\
+		W części badawczej ćwiczenia należało 
+		nauczyć perceptron autoasocjacji 4 poniższych wzorców (zapisanych tu w sposób - ((wejścia),(wyjścia))):\\
+		((1,0,0,0),(1,0,0,0)), ((0,1,0,0),(0,1,0,0)), ((0,0,1,0),(0,0,1,0)), ((0,0,0,1),(0,0,0,1)).
+		Dodatkowo należało zbadać wpływ uwzględnienia obciążenia w neuronach nieliniowych na skuteczność nauki. W tym celu zbadane zostały wartości otrzymywane na wyjściach 				neuronów ukrytych po zakończeniu nauki(przy współczynnikach: nauki - 0,6 momentum - 0,0).
+		Zbadana została również szybkość nauki perceptronu dla różnym wartości współczynników.
+		\subsection{Problem klasyfikacji}
+		Zadanie polegało na rozwiązaniu problemu klasyfikacji dwóch zbiorów danych przy pomocy dwóch klasyfikatorów.
+		Do implementacji klasyfikatorów został wykorzystany wcześniej wykonany perceptron wielowarstwowy oraz implementacja biblioteczna algorytmu k najbliższych sąsiadów.
+		Zbiór danych do treningu perceptronu stanowi jedną trzecią zbioru(wybierany jest co trzeci zestaw). Reszta danych stanowi zbiór do nauki perceptronu. Baza danych testowych dla 		klasyfikatora KNN stanowi 30 procent całego zbioru danych. Reszta czyli 70 procent zbioru stanowi zbiór do nauki.
+		
+	}
+	
+	\section{Opis implementacji}
+	{
+		Program implementujący perceptron oraz dodatkowy klasyfikator został napisanay w języku Python. Wybór uzasadiony był dostępem do bibliotek znacząco ułatwiających wczytywanie i przetwarzanie danych oraz generowanie wykresów interpretujących wyniki. Ogólnie dostępne biblioteki zostały wykorzystane do implementacji drugiego klasyfikatora(algorytm k najbliższych sąsiadów).
+		\subsection{Menu}
+		Plik ten zawiera kod pozwalający stworzyć sieć o konkretnych parametrach:
+		\begin{itemize}
+			\item ilość warstw
+			\item ilość neuronów na poszczególnej warstwie
+			\item obecność biasu
+			\item współczynnik nauki
+			\item współczynnik momentum
+			\item zbiór danych
+			\item ilość epok
+			\item porządana wielkość błęd
+		\end{itemize}
+		\subsection{prepData}
+		Plik zawiera zbiór funkcji przygotowujących dane do przetwarzania oraz dzielenia ich na zbiory do nauki i testów.
+		\subsection{NeuralNetwork}
+		Plik ten zawiera:
+		\begin{itemize}
+			\item definicję funkcji aktywującej
+			\item definicję pochodnej funkcji aktywującej
+			\item definicję klasy NeuralNetwork implementującej propagację w przód i w tył
+			\item definicję klasy NeuronLayer implementującej funkcjonalność pojedynczej warstwy
+			\item definicję funkcji learn implementującej proces nauki sieci
+			\item definicję funkcji test implementującej proces testowania sieci
+		\end{itemize}
+		\subsection{KNN}
+		Plik zawiera implementację klasyfikatora opartego o algorytm k najbliższych sąsiadów z użyciem bibliotek.
+	}
+	
+	\section{Materiały i metody}
+	{
+		Aby uruchomić program należy umieścić w katalogu z programem wybrane zbiory danych.
+		W celu skorzystania z implementacji klasyfikatora opartego o perceptron należy uruchomić plik "Menu" po wczęśniejszym dobraniu odpowiednich współczynników i zbioru danych.
+		Aby skorzystać z klasyfikatora oprtego o algorytm k najbliższych sąsiadów należy po wybraniu zbioru danych uruchmić plik "KNN".
+	}
+\section{Wyniki}
+
+\subsection{Perceptron autoasocjacji}
+Do zadanego błędu - 0.001
+\subsubsection{Wpływ uwzględnienia obciążenia w neuronach nieliniowych na skuteczność nauki}
+Ilość iteracji:  10000
+
+    
+
+\end{document}
