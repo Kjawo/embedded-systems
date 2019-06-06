@@ -1,3 +1,23 @@
+/******************************************************************************
+ *
+ * File:
+ *    main.c
+ *
+ * Authors:
+ *    Konrad Jaworski
+ *    Przemysław Rudowicz
+ *    Jakub Plich
+ *
+ *
+ * Description:
+ *    Snake game on LPC1768/9
+ *
+ *****************************************************************************/
+
+/******************************************************************************
+ * Includes
+ *****************************************************************************/
+
 #include "lpc17xx_pinsel.h"
 #include "lpc17xx_gpio.h"
 #include "lpc17xx_i2c.h"
@@ -17,14 +37,24 @@
 
 #include <stdlib.h>
 
-Bool OLED_COLOR = FALSE;
-Bool isCovered = FALSE;
-Bool isJoystickBroken = FALSE;
-Bool isAccBroken = FALSE;
-uint32_t seedForSrand = 0;
+
+/******************************************************************************
+ * Typedefs and defines
+ *****************************************************************************/
 
 #define NOTE_PIN_HIGH() GPIO_SetValue(0, 1<<26);
 #define NOTE_PIN_LOW()  GPIO_ClearValue(0, 1<<26);
+
+
+/*****************************************************************************
+ * Global variables
+ ****************************************************************************/
+
+Bool OLED_COLOR = FALSE;
+Bool isJoystickBroken = FALSE;
+Bool isAccBroken = FALSE;
+
+uint32_t seedForSrand = 0;
 
 static uint32_t notes[] = {
         2272, // A - 440 Hz
@@ -42,6 +72,44 @@ static uint32_t notes[] = {
         1432, // f - 698 Hz
         1275, // g - 784 Hz
 };
+
+static uint8_t *song_up = (uint8_t *) "C4,";
+static uint8_t *song_down = (uint8_t *) "D4,";
+
+
+/*****************************************************************************
+ * Structures definition
+ ****************************************************************************/
+
+struct Point {
+    uint8_t x;
+    uint8_t y;
+};
+
+struct Fruit {
+    uint8_t x1;
+    uint8_t y1;
+
+    uint8_t x2;
+    uint8_t y2;
+
+    uint8_t x3;
+    uint8_t y3;
+
+    uint8_t x4;
+    uint8_t y4;
+};
+
+
+struct Snake {
+    struct Point *snakeBody;
+    struct Fruit fruit;
+    uint8_t size;
+    uint8_t lastDirection;
+    Bool isBlocked;
+    uint16_t score;
+};
+
 
 static void playNote(uint32_t note, uint32_t durationMs) {
 
@@ -123,42 +191,9 @@ static void playSong(uint8_t *song) {
     }
 }
 
-static uint8_t *song_up = (uint8_t *) "C4,";
-static uint8_t *song_down = (uint8_t *) "D4,";
-
-
 static void showScore(uint16_t score) {
     pca9532_setLeds(score, 0xffff);
 }
-
-struct Point {
-    uint8_t x;
-    uint8_t y;
-};
-
-struct Fruit {
-    uint8_t x1;
-    uint8_t y1;
-
-    uint8_t x2;
-    uint8_t y2;
-
-    uint8_t x3;
-    uint8_t y3;
-
-    uint8_t x4;
-    uint8_t y4;
-};
-
-
-struct Snake {
-    struct Point *snakeBody;
-    struct Fruit fruit;
-    uint8_t size;
-    uint8_t lastDirection;
-    Bool isBlocked;
-    uint16_t score;
-};
 
 
 struct Point createPoint(int x, int y) {
@@ -472,7 +507,7 @@ uint32_t getTimer1TC() {
 
 int main(void) {
 
-	int waitValue = 50;
+    int waitValue = 50;
     initTimer1();
     rotary_init();
 
@@ -551,15 +586,14 @@ int main(void) {
 
             if (rotaryState == ROTARY_RIGHT) {
                 waitValue += 10;
-            }
-            else {
+            } else {
                 waitValue -= 10;
             }
 
             if (waitValue > 125)
-            	waitValue = 125;
+                waitValue = 125;
             else if (waitValue <= 5)
-            	waitValue = 5;
+                waitValue = 5;
 
         }
 
@@ -569,45 +603,44 @@ int main(void) {
         y = y + yoff;
         z = z + zoff;
 
-        if(!isJoystickBroken) {
-        	state = joystick_read();
-        	if (state == JOYSTICK_LEFT || state == JOYSTICK_RIGHT || state == JOYSTICK_UP || state == JOYSTICK_DOWN) {
-				if(state == lastJoystickState) {
-					lastJoystickStateCounter++;
-					if(lastJoystickStateCounter > 50) {
-						isJoystickBroken = TRUE;
-					}
-				} else {
-					lastJoystickStateCounter = 0;
-				}
-				s->lastDirection = state;
-			}
-        	lastJoystickState = state;
+        if (!isJoystickBroken) {
+            state = joystick_read();
+            if (state == JOYSTICK_LEFT || state == JOYSTICK_RIGHT || state == JOYSTICK_UP || state == JOYSTICK_DOWN) {
+                if (state == lastJoystickState) {
+                    lastJoystickStateCounter++;
+                    if (lastJoystickStateCounter > 50) {
+                        isJoystickBroken = TRUE;
+                    }
+                } else {
+                    lastJoystickStateCounter = 0;
+                }
+                s->lastDirection = state;
+            }
+            lastJoystickState = state;
         }
 
-        if(!isAccBroken) {
-        	if((x*x + y*y + z*z) > 6000  ){
-        		accStateCounter++;
-        		if(accStateCounter > 50)
-        			isAccBroken = TRUE;
-        	}
-        	else accStateCounter = 0;
+        if (!isAccBroken) {
+            if ((x * x + y * y + z * z) > 6000) {
+                accStateCounter++;
+                if (accStateCounter > 50)
+                    isAccBroken = TRUE;
+            } else accStateCounter = 0;
         }
 
-        if(!isAccBroken) {
-			if (x < -10) {
-				state = JOYSTICK_RIGHT;
-				s->lastDirection = state;
-			} else if (x > 10) {
-				state = JOYSTICK_LEFT;
-				s->lastDirection = state;
-			} else if (y > 10) {
-				state = JOYSTICK_DOWN;
-				s->lastDirection = state;
-			} else if (y < -10) {
-				state = JOYSTICK_UP;
-				s->lastDirection = state;
-			}
+        if (!isAccBroken) {
+            if (x < -10) {
+                state = JOYSTICK_RIGHT;
+                s->lastDirection = state;
+            } else if (x > 10) {
+                state = JOYSTICK_LEFT;
+                s->lastDirection = state;
+            } else if (y > 10) {
+                state = JOYSTICK_DOWN;
+                s->lastDirection = state;
+            } else if (y < -10) {
+                state = JOYSTICK_UP;
+                s->lastDirection = state;
+            }
 
         }
 
