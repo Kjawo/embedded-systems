@@ -39,7 +39,7 @@
 
 
 /******************************************************************************
- * Typedefs and defines
+ * Defines
  *****************************************************************************/
 
 #define NOTE_PIN_HIGH() GPIO_SetValue(0, 1<<26);
@@ -111,6 +111,10 @@ struct Snake {
 };
 
 
+/*****************************************************************************
+ * Functions definitions
+ ****************************************************************************/
+
 static void playNote(uint32_t note, uint32_t durationMs) {
 
     uint32_t t = 0;
@@ -135,6 +139,16 @@ static void playNote(uint32_t note, uint32_t durationMs) {
     }
 }
 
+/*****************************************************************************
+ * Function name:		getNote
+ *
+ * Description:			convert character of note into pitch
+ *
+ * Argument:			single note character
+ *
+ * Returns:				pitch
+ ****************************************************************************/
+
 static uint32_t getNote(uint8_t ch) {
     if (ch >= 'A' && ch <= 'G')
         return notes[ch - 'A'];
@@ -145,12 +159,38 @@ static uint32_t getNote(uint8_t ch) {
     return 0;
 }
 
+/*****************************************************************************
+ * Function name:		getDuration
+ *
+ * Description:			get duration of note (on a scale from 0 to 1800 ms)
+ *
+ * Argument:			duration (from '0' to '9')
+ *
+ * Returns:				duration in ms
+ ****************************************************************************/
+
 static uint32_t getDuration(uint8_t ch) {
     if (ch < '0' || ch > '9')
         return 400;
     /* number of ms */
     return (ch - '0') * 200;
 }
+
+/*****************************************************************************
+ * Function name:		getPause
+ *
+ * Description:			get duration of pause
+ *
+ * Argument:			character describing pause duration
+ * 						'+' 	= 0ms
+ * 						',' 	= 5ms
+ * 						'.' 	= 20ms
+ * 						'_' 	= 30ms
+ * 						default = 5ms
+ *
+ *
+ * Returns:				duration in ms
+ ****************************************************************************/
 
 static uint32_t getPause(uint8_t ch) {
     switch (ch) {
@@ -191,10 +231,28 @@ static void playSong(uint8_t *song) {
     }
 }
 
+/*****************************************************************************
+ * Function name:		showScore
+ *
+ * Description:			show score on PCA9532 (in binary format)
+ *
+ * Argument:			score (type uint16_t)
+ *
+ ****************************************************************************/
+
 static void showScore(uint16_t score) {
     pca9532_setLeds(score, 0xffff);
 }
 
+/*****************************************************************************
+ * Function name:		createPoint
+ *
+ * Description:			create point at given coordinates
+ *
+ * Arguments:			x and y position
+ *
+ * Returns:				Point structure
+ ****************************************************************************/
 
 struct Point createPoint(int x, int y) {
     struct Point point;
@@ -203,7 +261,14 @@ struct Point createPoint(int x, int y) {
     return point;
 }
 
-void clearScreenWithFrame() {
+/*****************************************************************************
+ * Function name:		clearScreen
+ *
+ * Description:			Clear all pixels on screen and draw frame
+ *
+ ****************************************************************************/
+
+void clearScreen() {
     oled_clearScreen(OLED_COLOR);
     for (int i = 0; i < OLED_DISPLAY_HEIGHT - 1; i++) {
         oled_putPixel(0, i, !OLED_COLOR);
@@ -216,6 +281,15 @@ void clearScreenWithFrame() {
     }
 }
 
+/*****************************************************************************
+ * Function name:		createSnake
+ *
+ * Description:			create Snake of given size
+ *
+ * Argument:			size of the snake
+ *
+ * Returns:				pointer to Snake structure
+ ****************************************************************************/
 
 struct Snake *createSnake(uint8_t size) {
     struct Point *snakeBody;
@@ -251,19 +325,15 @@ struct Snake *createSnake(uint8_t size) {
     return newSnake;
 }
 
-void deleteOldSnake(struct Snake *s) {
-    int size = 30;
-    s->size = size;
-    struct Point *snakeBody;
-    snakeBody = malloc(size * sizeof(struct Point));
-    for (int i = 0; i < size; i++) {
-        struct Point p = createPoint(48 + i, 32);
-        snakeBody[i] = p;
-    }
-
-    s->snakeBody = snakeBody;
-    clearScreenWithFrame();
-}
+/*****************************************************************************
+ * Function name:		createFruit
+ *
+ * Description:			create fruit at given coordinates
+ *
+ * Arguments:			x and y position
+ *
+ * Returns:				Fruit structure
+ ****************************************************************************/
 
 struct Fruit createFruit(int x, int y) {
     struct Fruit f;
@@ -281,7 +351,31 @@ struct Fruit createFruit(int x, int y) {
     return f;
 }
 
-void incSnake(struct Snake *s) {
+/*****************************************************************************
+ * Function name:		addPointToSnake
+ *
+ * Description:			add point to snake body with given position
+ *
+ * Arguments:			snake structure pointer, x and y position
+ ****************************************************************************/
+
+void addPointToSnake(struct Snake *s, uint8_t x, uint8_t y) {
+    struct Point newPoint = createPoint(x, y);
+    s->snakeBody[s->size - 1] = newPoint;
+}
+
+/*****************************************************************************
+ * Function name:		incrementSnakeSize
+ *
+ * Description:			put new point at snake head and increment size
+ * 						(using snake last direction)
+ *
+ * Arguments:			snake structure pointer
+ *
+ * Returns:				Fruit structure
+ ****************************************************************************/
+
+void incrementSnakeSize(struct Snake *s) {
     s->size += 1;
     struct Point *snakeBody2;
     snakeBody2 = malloc(s->size * sizeof(struct Point));
@@ -295,26 +389,30 @@ void incSnake(struct Snake *s) {
     struct Point snakeHead = s->snakeBody[s->size - 2];
 
     if ((s->lastDirection) == JOYSTICK_RIGHT) {
-        struct Point newPoint = createPoint(snakeHead.x + 1, snakeHead.y);
-        s->snakeBody[s->size - 1] = newPoint;
+    	addPointToSnake(s, snakeHead.x + 1, snakeHead.y);
     } else if ((s->lastDirection) == JOYSTICK_LEFT) {
-        struct Point newPoint = createPoint(snakeHead.x - 1, snakeHead.y);
-        s->snakeBody[s->size - 1] = newPoint;
+    	addPointToSnake(s, snakeHead.x - 1, snakeHead.y);
     } else if ((s->lastDirection) == JOYSTICK_UP) {
-        struct Point newPoint = createPoint(snakeHead.x, snakeHead.y - 1);
-        s->snakeBody[s->size - 1] = newPoint;
+    	addPointToSnake(s, snakeHead.x, snakeHead.y - 1);
     } else if ((s->lastDirection) == JOYSTICK_DOWN) {
-        struct Point newPoint = createPoint(snakeHead.x, snakeHead.y + 1);
-        s->snakeBody[s->size - 1] = newPoint;
+    	addPointToSnake(s, snakeHead.x, snakeHead.y + 1);
     }
 
 }
+
+/*****************************************************************************
+ * Function name:		eatFruit
+ *
+ * Description:			erase old fruit and create new one at random position
+ *
+ * Argument:			snake structure pointer
+ ****************************************************************************/
 
 void eatFruit(struct Snake *s) {
     uint8_t x = rand() % 90 + 3;
     uint8_t y = rand() % 42 + 3;
 
-    //Wymaż z ekranu stary owoc
+    //Erase old fruit from the screen
     oled_putPixel(s->fruit.x1, s->fruit.y1, OLED_COLOR);
     oled_putPixel(s->fruit.x2, s->fruit.y2, OLED_COLOR);
     oled_putPixel(s->fruit.x3, s->fruit.y3, OLED_COLOR);
@@ -324,10 +422,57 @@ void eatFruit(struct Snake *s) {
     s->fruit = f;
     s->score += 1;
     showScore(s->score);
-    incSnake(s);
-    incSnake(s);
+    incrementSnakeSize(s);
+    incrementSnakeSize(s);
 
 }
+
+/*****************************************************************************
+ * Function name:		checkCollisions
+ *
+ * Description:			check collisions with wall, snake body and fruit
+ *
+ * Argument:			snake structure pointer
+ ****************************************************************************/
+
+static void checkCollisions(struct Snake *s) {
+    //Check collisions with walls
+    if (s->snakeBody[s->size - 1].x <= 1 ||
+    	s->snakeBody[s->size - 1].x >= OLED_DISPLAY_WIDTH - 1 ||
+		s->snakeBody[s->size - 1].y <= 1 ||
+		s->snakeBody[s->size - 1].y >= OLED_DISPLAY_HEIGHT - 1) {
+			s->lastDirection = 99;
+			playSong(song_up);
+			s->isBlocked = TRUE;
+    }
+
+    //Check collisions with snake body
+    for (int i = 0; i < s->size - 1; i++) {
+        if (s->snakeBody[s->size - 1].x == s->snakeBody[i].x) {
+            if (s->snakeBody[s->size - 1].y == s->snakeBody[i].y) {
+                s->lastDirection = 99;
+                playSong(song_up);
+                s->isBlocked = TRUE;
+            }
+        }
+    }
+
+    //Check collisions with fruit
+    if ((s->snakeBody[s->size - 1].x == s->fruit.x1 && s->snakeBody[s->size - 1].y == s->fruit.y1) ||
+        (s->snakeBody[s->size - 1].x == s->fruit.x2 && s->snakeBody[s->size - 1].y == s->fruit.y2) ||
+        (s->snakeBody[s->size - 1].x == s->fruit.x3 && s->snakeBody[s->size - 1].y == s->fruit.y3) ||
+        (s->snakeBody[s->size - 1].x == s->fruit.x4 && s->snakeBody[s->size - 1].y == s->fruit.y4)) {
+        	eatFruit(s);
+    }
+}
+
+/*****************************************************************************
+ * Function name:		drawStruct
+ *
+ * Description:			erase old fruit and create new one at random position
+ *
+ * Argument:			snake structure pointer
+ ****************************************************************************/
 
 static void drawStruct(struct Snake *s) {
 
@@ -340,34 +485,7 @@ static void drawStruct(struct Snake *s) {
     oled_putPixel(s->fruit.x3, s->fruit.y3, !OLED_COLOR);
     oled_putPixel(s->fruit.x4, s->fruit.y4, !OLED_COLOR);
 
-    //sprawdzanie wystąpienia kolizji ze ścianami
-    if (s->snakeBody[s->size - 1].x <= 1 || s->snakeBody[s->size - 1].x >= OLED_DISPLAY_WIDTH - 1 ||
-        s->snakeBody[s->size - 1].y <= 1 || s->snakeBody[s->size - 1].y >= OLED_DISPLAY_HEIGHT - 1) {
-        //blokowanie ruchu
-        s->lastDirection = 99;
-        playSong(song_up);
-        s->isBlocked = TRUE;
-    }
 
-    //sprawdzenie kolizji z ciałem węża
-    for (int i = 0; i < s->size - 1; i++) {
-        if (s->snakeBody[s->size - 1].x == s->snakeBody[i].x) {
-            if (s->snakeBody[s->size - 1].y == s->snakeBody[i].y) {
-                s->lastDirection = 99;
-                playSong(song_up);
-                s->isBlocked = TRUE;
-            }
-        }
-    }
-
-    //sprawdzanie kolizji z owocami
-    if ((s->snakeBody[s->size - 1].x == s->fruit.x1 && s->snakeBody[s->size - 1].y == s->fruit.y1) ||
-        (s->snakeBody[s->size - 1].x == s->fruit.x2 && s->snakeBody[s->size - 1].y == s->fruit.y2) ||
-        (s->snakeBody[s->size - 1].x == s->fruit.x3 && s->snakeBody[s->size - 1].y == s->fruit.y3) ||
-        (s->snakeBody[s->size - 1].x == s->fruit.x4 && s->snakeBody[s->size - 1].y == s->fruit.y4)
-            ) {
-        eatFruit(s);
-    }
 }
 
 void checkLightSensor() {
@@ -376,19 +494,19 @@ void checkLightSensor() {
     if (light < 25) {
         if (OLED_COLOR == FALSE) {
             OLED_COLOR = TRUE;
-            clearScreenWithFrame();
+            clearScreen();
         }
 
     } else {
         if (OLED_COLOR == TRUE) {
             OLED_COLOR = FALSE;
-            clearScreenWithFrame();
+            clearScreen();
         }
     }
 }
 
 
-static void moveSnake(struct Snake *s) { //moving snake without changing direction
+static void moveSnake(struct Snake *s) {
 
     if (s->lastDirection == 99)
         return;
@@ -399,20 +517,15 @@ static void moveSnake(struct Snake *s) { //moving snake without changing directi
     for (int i = 0; i < (s->size - 1); i++) {
         s->snakeBody[i] = s->snakeBody[i + 1];
     }
-    if ((s->lastDirection) == JOYSTICK_RIGHT) {
-        struct Point newPoint = createPoint(snakeHead.x + 1, snakeHead.y);
-        s->snakeBody[s->size - 1] = newPoint;
-    } else if ((s->lastDirection) == JOYSTICK_LEFT) {
-        struct Point newPoint = createPoint(snakeHead.x - 1, snakeHead.y);
-        s->snakeBody[s->size - 1] = newPoint;
-    } else if ((s->lastDirection) == JOYSTICK_UP) {
-        struct Point newPoint = createPoint(snakeHead.x, snakeHead.y - 1);
-        s->snakeBody[s->size - 1] = newPoint;
-    } else if ((s->lastDirection) == JOYSTICK_DOWN) {
-        struct Point newPoint = createPoint(snakeHead.x, snakeHead.y + 1);
-        s->snakeBody[s->size - 1] = newPoint;
-    } else {
 
+    if ((s->lastDirection) == JOYSTICK_RIGHT) {
+    	addPointToSnake(s, snakeHead.x + 1, snakeHead.y);
+    } else if ((s->lastDirection) == JOYSTICK_LEFT) {
+    	addPointToSnake(s, snakeHead.x - 1, snakeHead.y);
+    } else if ((s->lastDirection) == JOYSTICK_UP) {
+    	addPointToSnake(s, snakeHead.x, snakeHead.y - 1);
+    } else if ((s->lastDirection) == JOYSTICK_DOWN) {
+    	addPointToSnake(s, snakeHead.x, snakeHead.y + 1);
     }
 
 
@@ -561,7 +674,7 @@ int main(void) {
     oled_clearScreen(!OLED_COLOR);
 
     struct Snake *s = createSnake(30);
-    clearScreenWithFrame();
+    clearScreen();
     drawStruct(s);
     showScore(s->score);
     light_enable();
@@ -655,7 +768,7 @@ int main(void) {
         if (btn1 == 0) {
             playSong(song_down);
 
-            clearScreenWithFrame();
+            clearScreen();
             free(s);
             s = createSnake(30);
             s->isBlocked = FALSE;
@@ -668,7 +781,6 @@ int main(void) {
         Timer0_Wait(1);
     }
 
-    deleteOldSnake(s);
 
 
 }
