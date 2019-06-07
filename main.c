@@ -467,14 +467,14 @@ static void checkCollisions(struct Snake *s) {
 }
 
 /*****************************************************************************
- * Function name:		drawStruct
+ * Function name:		drawSnake
  *
  * Description:			erase old fruit and create new one at random position
  *
  * Argument:			snake structure pointer
  ****************************************************************************/
 
-static void drawStruct(struct Snake *s) {
+static void drawSnake(struct Snake *s) {
 
     for (int i = 0; i < s->size; i++) {
         oled_putPixel(s->snakeBody[i].x, s->snakeBody[i].y, !OLED_COLOR);
@@ -485,7 +485,7 @@ static void drawStruct(struct Snake *s) {
     oled_putPixel(s->fruit.x3, s->fruit.y3, !OLED_COLOR);
     oled_putPixel(s->fruit.x4, s->fruit.y4, !OLED_COLOR);
 
-
+    checkCollisions(s);
 }
 
 void checkLightSensor() {
@@ -529,7 +529,7 @@ static void moveSnake(struct Snake *s) {
     }
 
 
-    drawStruct(s);
+    drawSnake(s);
 }
 
 
@@ -675,7 +675,7 @@ int main(void) {
 
     struct Snake *s = createSnake(30);
     clearScreen();
-    drawStruct(s);
+    drawSnake(s);
     showScore(s->score);
     light_enable();
 
