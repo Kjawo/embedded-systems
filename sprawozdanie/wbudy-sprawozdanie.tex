@@ -162,7 +162,30 @@
 		
 		W celu ustawienia stanu wysokiego na pinie P0.26 należy ustawić 1 na 26 bicie rejestru FIOSET (ustawianie zera na tym rejestrze nie ustawia stanu niskiego). Aby odwołać stan wysoki należy wpisać 1 na 26 bicie rejestru FIOCLR.
 		\subsubsection{Joystick}
+		Joystick również jest obsługiwany przy pomocy pinów GPIO. Natomiast w przeciwieństwie do głośnika, joystick wysyła dane do mikrokontrolera, a więc podczas jego inicjalizacji ustawiamy wszystkie piny na wejście.
 		
+		W tym celu ustawiamy wartość '0' na 15, 16 i 17 bicie rejestru FIODIR0 oraz na 3 i 4 bicie rejestru FIODIR2. 
+		
+\begin{center}
+			\begin{tabular}{|c|c|c|}
+			\hline 
+			\textbf{Pozycja joysticka} & \textbf{wartość} & \textbf{Piny GPIO} \\ 
+			\hline 
+			JOYSTICK\_CENTER & 0x01 & P0.17 \\ 
+			\hline 
+			JOYSTICK\_UP & 0x02 & P2.3 \\ 
+			\hline 
+			JOYSTICK\_DOWN & 0x04 & P0.15 \\ 
+			\hline 
+			JOYSTICK\_LEFT & 0x08 & P2.4 \\ 
+			\hline 
+			JOYSTICK\_RIGHT & 0x10 & P0.16 \\ 
+			\hline 
+		\end{tabular} 
+\end{center}
+		
+		Stany podłączonych pinów odpowiadają stanom wciśnięcia joysticka (odpowiednio tak jak w tabeli powyżej).
+		W celu odczytania stanu joysticka sprawdzane są wartości na kolejnych pinach (odpowiednio tak jak w tabeli powyżej) i jeżeli jego wartość to '0', zmienna przechowująca stan joysticka przyjmuje wartość koniunkcji bitowej tego stanu i odpowiadającej wartości (patrz tabela powyżej) przypisanej do pozycji joysticka. 
 		\subsection{Akcelerometr}
 	
 		
