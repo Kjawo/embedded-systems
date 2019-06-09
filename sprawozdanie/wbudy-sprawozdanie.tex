@@ -75,9 +75,12 @@
 				\hline 
 				I\textsuperscript{2}C & Jakub Plich \\ 
 				\hline 
+				Rotacyjny przełącznik kwadraturowy & Jakub Plich\\
+				\hline
 			\end{tabular} 	
 		\end{center}
 	}
+
 
 	\subsection{Podział obowiązków}
 \begin{center}
@@ -102,11 +105,64 @@
 		\subsection{Opis algorytmu}
 		
 	\section{Funkcjonalności}
-		\subsection{GPIO (joystick)}
-		GPIO (oznacza general-purpose input/output) - interfejs wejścia/wyjścia ogólnego przeznaczenia. 
+		\subsection{GPIO}
+		GPIO (oznacza general-purpose input/output) - interfejs wejścia/wyjścia ogólnego przeznaczenia. Należy ustawić kierunki wejścia/wyjścia pinów GPIO (0 - gdy chcemy skonfigurować pin jako wejście, lub 1 - jako wyjście).
 		
-		\subsection{Głośnik}
+		\subsubsection{Głośnik}
+		Głośnik jest obsługiwany przy pomocy pinów GPIO.  Jako, że głośnik nie będzie wysyłał danych, piny ustawiamy na wyjście. W tym celu ustawiamy wartość 1 w rejestrach FIODIR0 i FIODIR2 w miejscach odpowiadających pinom głośnika (każdy bit rejestru odpowiada jednemu pinowi GPIO, każdy port GPIO ma swój rejestr FIODIR). A więc 1 należy ustawić na 28, 27, 26 bicie FIODIR0 i 13 bicie FIODIR2.
+		
+		
+		Wzmacniacz analogowy LM4811, który znajduje się na płytce LPCXpresso Base Board potrzebuje następujących pinów z mikrokontrolera:
+		\begin{itemize}
+			\item CLK
+			\item UP/DN
+			\item SHUTDN
+			\item VIN1/VIN2
+		\end{itemize}
 	
+		\medskip
+		Ze specyfikacji LM8411 \cite{LM4811} dowiadujemy się, że piny CLK (CLOCK) oraz UP/DN
+		są odpowiedzialne za sterowanie głośnością brzęczyka.
+		
+		
+		Pin SHUTDN aktywuje funkcję zmniejszającą pobór prądu przez wzmacniacz (Nie korzystamy z tej funkcji).
+		
+		
+		Piny VIN1/VIN2 odpowiadają za generację sygnału wprawiającego
+		membranę brzęczyka w drgania (generowanie dźwięków).\\
+		
+		
+		\begin{center}
+			Sposób połączenie pinów wzmacniacza analogowego do pinów GPIO:\smallskip
+
+			\begin{tabular}{|c|c|}
+				\hline 
+				\textbf{Piny LM4811} & \textbf{Piny GPIO} \\ 
+				\hline 
+				CLK & P0.27 \\ 
+				\hline 
+				UP/DN & P0.28 \\ 
+				\hline 
+				SHUTDN & P2.13 \\ 
+				\hline 
+				VIN1/VIN2 & P0.26 \\ 
+				\hline 
+			\end{tabular} 
+		\end{center}
+	
+		Podczas inicjalizacji głośnika czyszczone są wartość na pinach P0.27, P0.28, P2.13 (ustawiamy 1 w rejestrach FIOCLR dla portu 0 i 2 w miejscach odpowiadających wymienionym pinom).
+		
+		
+		Generowanie dźwięku przez brzęczyka odbywa się poprzez podawaniu zmiennego napięcia na pin P0.26 tak aby
+		wprowadzić membranę brzęczyka w drgania. Pozwala to na generowanie prostych nut. 
+		
+		
+		Aby zagrać nutę 'C', należy wprowadzić membranę brzęczka w drgania o częstotliwości $f=262Hz$. A więc okres drań $T=\frac{1}{f} = 3816 \mu s$. Stąd na pinie P0.26 należy ustawić stan wysoki przez czas równy $\frac{T}{2} = 1908\mu s$ oraz stan niski analogicznie przez  $\frac{T}{2}$. Cykl należy powtarzać w zależności od tego jak długo chcemy odtwarzać dźwięk. Do ustawiania stanów wysokich i niskich na pinach GPIO używamy rejestru FIOSET i FIOCLR. Za
+		generowanie dźwięku odpowiada pin P0.26. Analogicznie postępujemy w przypadku innych nut.
+		
+		W celu ustawienia stanu wysokiego na pinie P0.26 należy ustawić 1 na 26 bicie rejestru FIOSET (ustawianie zera na tym rejestrze nie ustawia stanu niskiego). Aby odwołać stan wysoki należy wpisać 1 na 26 bicie rejestru FIOCLR.
+		\subsubsection{Joystick}
+		
 		\subsection{Akcelerometr}
 	
 		
@@ -135,5 +191,15 @@
 		\hline 
 	\end{tabular} 
 
+
+\begin{thebibliography}{abcd}
+	\bibitem{LM4811}{
+		\textit{LM4811
+			Dual 105mW Headphone Amplifier with Digital Volume
+			Control and Shutdown Mode Datasheet},
+		{December 2002},
+		\textbf{National Semiconductor}
+	}		
+\end{thebibliography}
 
 \end{document}
