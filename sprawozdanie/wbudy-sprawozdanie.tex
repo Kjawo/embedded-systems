@@ -187,8 +187,20 @@
 		Stany podłączonych pinów odpowiadają stanom wciśnięcia joysticka (odpowiednio tak jak w tabeli powyżej).
 		W celu odczytania stanu joysticka sprawdzane są wartości na kolejnych pinach (odpowiednio tak jak w tabeli powyżej) i jeżeli jego wartość to '0', zmienna przechowująca stan joysticka przyjmuje wartość koniunkcji bitowej tego stanu i odpowiadającej wartości (patrz tabela powyżej) przypisanej do pozycji joysticka. 
 		\subsection{Akcelerometr}
+	Użyty przez nas akcelerometr MMA7455L \cite{MMA7455L} jest inicjalizowany (za pomocą I\textsuperscript{2}C (adres urządzenia - 0x1D)) przez zdefiniowanie trybu pomiaru i czułości. Dokonujemy tego poprzez wpisanie do rejestru MCTL (Mode Control o adresie 0x16) wartości 1 na bicie zerowym (odpowiada za ustawienie czułości na 2g) oraz wartości 1 na bicie drugim (odpowiada za ustawienie trybu pomiarowego (Measurement Mode)).
 	
-		
+\begin{center}
+		\resizebox{\textwidth}{!}{%
+	\begin{tabular}{|c|c|c|c|c|c|}
+		\hline 
+		Adres & Nazwa rejestru & Bit 3 (GLVL[1]) & Bit 2 (GLVL[0]) & Bit 1 (MOD[1]) & Bit 0 (MOD[0]) \\ 
+		\hline 
+		0x16 & MCTL & 0 & 1 & 0 & 1 \\ 
+		\hline 
+	\end{tabular} 
+	}
+\end{center}
+			
 		\subsection{Timer}
 		
 		\subsection{OLED}
@@ -211,7 +223,7 @@ Na koniec należy w rejestrze I2CONSET ustawiamy wartość 1 na 6 bicie aby wł�
 	\section{Analiza FMEA}
 	
 
-	
+	\resizebox{\textwidth}{!}{%
 	\hspace*{-85pt}\begin{tabular}{|c|c|c|c|c|c|}
 		\hline 
 		Ryzyko & Prawdopodobieństwo & Znaczenie & (Samo)Wykrywalność & Iloczyn & Reakcja \\ 
@@ -219,16 +231,24 @@ Na koniec należy w rejestrze I2CONSET ustawiamy wartość 1 na 6 bicie aby wł�
 		Uszkodzenie joysticka &  &  &  &  &  \\ 
 		\hline 
 	\end{tabular} 
+}
 
 
 \begin{thebibliography}{abcd}
+	\bibitem{MMA7455L}{
+		\textit{$\pm$2g/$\pm$24g/$\pm$28g Three Axis Low-g
+			Digital Output Accelerometer},
+		{Rev 8, 07/2009},
+		\textbf{Freescale Semiconductor}
+	}	
+
 	\bibitem{LM4811}{
-		\textit{LM4811
-			Dual 105mW Headphone Amplifier with Digital Volume
-			Control and Shutdown Mode Datasheet},
-		{December 2002},
-		\textbf{National Semiconductor}
-	}		
+	\textit{LM4811
+		Dual 105mW Headphone Amplifier with Digital Volume
+		Control and Shutdown Mode Datasheet},
+	{December 2002},
+	\textbf{National Semiconductor}
+}		
 \end{thebibliography}
 
 \end{document}
