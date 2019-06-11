@@ -200,6 +200,35 @@
 	\end{tabular} 
 	}
 \end{center}
+
+		Aby odczytać wartości wskazań akcelerometru najpierw zostaje sprawdzona wartość z rejestru przechowujące informację o statusie akcelerometru (rejestr o adresie 0x09). Na bicie zerowym tego rejestru (DRDY) przechowywana jest informacja, czy dane są gotowe do odczytania.
+\begin{center}
+			\begin{tabular}{|c|c|}
+			\hline 
+			\vtop{\hbox{\strut \textbf{Wartość na bicie DRDY}}\hbox{\strut \textbf{rejestru 0x09}}} & \textbf{Znaczenie} \\ 
+			\hline 
+			1 & dane są gotowe do odczytania \\ 
+			\hline 
+			0 & dane nie są gotowe do odczytania \\ 
+			\hline 
+		\end{tabular} 
+\end{center}
+		
+		Jeżeli dane są gotowe do odczytania, z rejestru XOUT8 (o adresie 0x06) pobierane jest 8 bitów, które opisują składową X wektora przyspieszenia. Następnie, kolejno odczytywane są wartości z rejestrów YOUT8 (0x07) oraz ZOUT8 (0x08), które opisują odpowiednio składowe Y i Z. 
+		
+\begin{center}
+			\begin{tabular}{|c|c|}
+			\hline 
+			\textbf{Adres rejestru} & \textbf{Nazwa rejestru} \\ 
+			\hline 
+			0x06 & XOUT8 \\ 
+			\hline 
+			0x07 & YOUT8 \\ 
+			\hline 
+			0x08 &  ZOUT8\\ 
+			\hline 
+		\end{tabular} 
+\end{center}
 			
 		\subsection{Timer}
 		
