@@ -101,9 +101,40 @@
 	\section{Opis działania programu}
 	
 		\subsection{Instrukcja użytkownika}
+		Po podłączeniu płytki do zasilania na wyświetlaczu OLED zostanie narysowany wąż (reprezentowany przez ciąg pikseli tworzący linię łamaną) oraz owoc reprezentowany przez grupę 4 pikseli (kwadrat 2x2 w lewej, górnej części ekranu).\\
+		
+		
+		Aby rozpocząć grę należy wcisnąć przycisk z prawej strony joysticka.\\
+		
+		
+		Do zmiany kierunku poruszania się węża można użyć joysticka lub akcelerometru (przechylać płytkę).
+		
+		
+		Celem gry jest zebranie/zjedzenie jak największej liczy owoców. Dokonuje się to poprzez zderzenie się głowy węża oraz ciała owocu. Aktualny wynik gracza (liczba zjedzonych owoców) jest przedstawiany w postaci binarnej na diodach LED expandera.
+		
+		
+		Gracz przegrywa w momencie, gdy głowa węża uderzy w ścianę lub w ciało węża (również, gdy gracz spróbuje 'cofnąć się' - zmienić kierunek poruszania się na przeciwny do obecnego).
+		
+		
+		Gracz może kontrolować szybkość poruszania się węża przy pomocy rotacyjnego przełącznika kwadraturowego (obrót w lewo zwiększa prędkość, a w prawo zmniejsza).
+		
+		
+		Po zakryciu czujnika światła, kolory na ekranie zostają odwrócone.
+		
+		
+		Aby zagrać kolejny raz należy ponownie wcisnąć przycisk z prawej strony joysticka.
+		
+		
 		
 		\subsection{Opis algorytmu}
+		Program został napisany w języku C. Wąż porusza się poprzez usuwanie ostatniej części swojego ciała i dodawanie nowego punktu na pozycji (obok głowy) wskazanej przez kierunek w którym ma się poruszać. Kierunek jest ustalany przez gracza poprzez wybranie go joystickiem lub przechylenie płytki w wybraną stronę.
 		
+		W głównej pętli funkcji main() sprawdzamy stan rotacyjnego przełącznika kwadraturowego i jeżeli program wykryje jego obrót, następuje inkrementacja lub dekrementacja zmiennej odpowiedzialnej za czas przestoju węża. Następnie pobierany jest stan akcelerometru i joysticka. Jeżeli stan joysticka zgadza się z wybranymi kierunkami (lewo, prawo, góra, dół) następuje przypisanie tego kierunku do kierunku poruszania się węża. Jeżeli wartości oczytane z akcelerometru przekroczą zadaną wartość, również nastąpi przypisanie do kierunku poruszania się węża, kierunku, w którym płytka została przechylona. Jeżeli wąż nie jest w stanie zablokowanym (nie uderzył wcześniej w ściany lub w samego siebie), wywoływana jest funkcja odpowiedzialna za poruszanie się węża, a następnie rysowanie go i sprawdzanie kolizji.
+		Jeżeli program wykryje przysłonięcie czujnika światła, następuje odwrócenie kolorów rysowanych obiektów.
+		Sprawdzany jest również stan wciśnięcia przycisku odpowiedzialnego za rozpoczynanie nowej tury gry.
+		
+	\section{Opis działania wykonanego sprzętu}
+	Nie było wykonanego sprzętu.
 	\section{Funkcjonalności}
 		\subsection{GPIO}
 		GPIO (oznacza general-purpose input/output) - interfejs wejścia/wyjścia ogólnego przeznaczenia. Należy ustawić kierunki wejścia/wyjścia pinów GPIO (0 - gdy chcemy skonfigurować pin jako wejście, lub 1 - jako wyjście).
