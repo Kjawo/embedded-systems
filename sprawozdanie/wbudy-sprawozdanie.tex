@@ -237,18 +237,19 @@
 		\subsection{SSP/SPI}
 		
 		\subsection{Czujnik światła}
-Czujnik światła jest urządzeniem peryferyjnym przyłączonym do płytki magistralą I\textsuperscript2C. Program wkorzystuje odczytane natężenie światła do odwrócenia kolorów na 			wyświetlaczu w momencie w którym odczytana wartość natężenia światła będzie mniejsza niż 25 luksów.\indent Uruchomienie czyjnika światła polega na przesłaniu przez	
+Czujnik światła jest urządzeniem peryferyjnym przyłączonym do płytki magistralą I\textsuperscript2C. Program wkorzystuje odczytane natężenie światła do odwrócenia kolorów na 			wyświetlaczu w momencie w którym odczytana wartość natężenia światła będzie mniejsza niż 25 luksów. Uruchomienie czyjnika światła polega na przesłaniu przez	
 I2C pod adres (0x44) kolejno wartości (0x00) oraz (1<<7) . To powoduje ustawienie wartości 1 na 7 bicie rejestru Command Register(0x00) i w konsekwencji 	uruchomienie przetwornika analogowo-cyfrowego w czujniku. Zakres odczytu czujnika jest domyślny i wynosi od 0 do 1000 luksów. Odczyt wartości pomiaru czujnika wymaga 				odczytania zawartości dwóch rejestrów:  LSB-Sensor - zawiera dolny bajt ostatniego odczytu sensora(adres 0x04), MSB-Sensor - zawiera górny bajt ostatniego odczytu 					sensora(adres 0x05). Wynik wyrażony w luksach jest obliczany z następującego wzoru: E = 973 * odczytana-wartość /  (1<<16)
 \subsection{PCA9532}
 Expander PCA9532 wyposażony w 16 diód LED jest wkorzystywany do reprezentacji wyniku w danym momencie gry. Zapalone diody przedstawiają wynik w postaci binarnej.
 W celu zapalenia odpowiednich diód należy ustalić 16 bitową maskie w której wartości 1 oznaczają zapaloną diodę. Następnie przez I2C pod adres rejestru kontrolnego(0x60)  				zostaje wysłany bajt kontrolny. Trzeci  bit bajtu kontorlnego onacza flagę inkrementacji która zwiększa o 1 adres podany w pozostałych 4 bitach po każdym przesłanym bajcie. 				Potem przesłane zostają 4 bajty które zostają kolejno wpisane do 4  8-bitowych rejestrów(LS0,LS1,LS2,LS3) w których każde 2 bity odpowiadają jednej diodzie. Program korzysta 				jedynie ze stanów OFF(00) oraz ON(01).
 \subsection{I\textsuperscript{2}C}
 I2C (Inter-Integrated Circuit) to szeregowa, dwukierunkowa magistrala do przesyłania danych. Program wykorzystuje ją do komunikacji z PCA9532, czujnikiem światła oraz 					akcelerometrem.
-\indent Początek inicjalizacji magistrali zaczyna się od konfiguracji pinów które będą pełniły fukcjię lini SCL(linia zegara) i SDA(linia danych). Dla interfejsu I2C2 są one ustawione 				odpowiednio na pinach P0[11] oraz P0[10]. W tym celu ustawiamy w rejestrze PINSEL0 wartosci 1 i 0 kolejno dla bitów 21 i 20(P0.10 SDA2) oraz wartość 1 i 0 dla bitów 23 i 22(P0.11 		SCL). Następnie następuje włączenie zasilania dla I2C poprzez ustawienie wartości 1 na 26 bicie rejestru PCONP(Power Control for Peripherals Register). Ustawiamy dzielnik zegara 			PCLK na 2 ustawiając w rejestrze PCLKSEL 20 i 21 bit na wartości kolejno 0 i 1. Następnie należy ustawić wartość rejestrów I2SCLH i I2SCLL na żądaną ilość cykli zegara PCLK. Obie			 	te wartości są sobie równe.
-
-
+Początek inicjalizacji magistrali zaczyna się od konfiguracji pinów które będą pełniły fukcjię lini SCL(linia zegara) i SDA(linia danych). Dla interfejsu I2C2 są one ustawione 				odpowiednio na pinach P0[11] oraz P0[10]. W tym celu ustawiamy w rejestrze PINSEL0 wartosci 1 i 0 kolejno dla bitów 21 i 20(P0.10 SDA2) oraz wartość 1 i 0 dla bitów 23 i 22(P0.11 		SCL). Następnie następuje włączenie zasilania dla I2C poprzez ustawienie wartości 1 na 26 bicie rejestru PCONP(Power Control for Peripherals Register). Ustawiamy dzielnik zegara 			PCLK na 2 ustawiając w rejestrze PCLKSEL 20 i 21 bit na wartości kolejno 0 i 1. Następnie należy ustawić wartość rejestrów I2SCLH i I2SCLL na żądaną ilość cykli zegara PCLK. Obie			 	te wartości są sobie równe.(...)
+ 
+Na koniec występuje ustawienie na wartość 1 bitów 2(flaga AA), 5(flaga STA) i 6(flaga I2EN) rejestru CONCLR.
 Na koniec należy w rejestrze I2CONSET ustawiamy wartość 1 na 6 bicie aby włączyć interfejs I2C2. 
-\subsection{}
+\subsection{Rotacyjny przełącznik kwadraturowy}
+Rotacyjny przełącznik kwadraturowy jest wykorzystywany w naszym programie do regulacji prędkości poruszania się "węża". Obrót przełącznika w prawo zmniejsza prędkość, a obór w lewo zwiększa. Inicjalizacja ogranicza się do ustawienia na porcie 0 GPIO wartości 0 na 24 i 25 bicie rejestru FIODIR(zerowy i pierwszy bit rejestru FIO0DIR3). Wartość 0 oznacza że pin jest ustawiony na wejście. Program odczytuje inforamcję o 4 stanach(są ustalone na podstawie położenia przełącznika). W zależności od kolejności występowania stanów ustalany jest kierunek ruchu przełącznika.
 	\section{Analiza FMEA}
 	
 
