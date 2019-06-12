@@ -262,25 +262,151 @@
 \end{center}
 			
 		\subsection{Timer}
+		Urządzenie wyposażone jest w 4 timery - timer0, timer1, timer2, timer3. W naszym projekcie wykorzystujemy 2 z nich - timer0 oraz timer1. 
+		\newline Najważniejsze rejestry, używane do konfiguracji Timera to:
+		\newline \textbullet Rejestr IR - Zawiera informacje, czy Timer oczekuje na obsługe przerwania. Może zostać on wyzerowany w celu usunięcia oczekujących przerwań.
+		\newline \textbullet Rejestr TCR - wyzerowanie spowoduje restart Timera
+		\newline \textbullet Rejestr PC - jest inkrementowany co każdy cykl PCLK
+		\newline \textbullet Rejestr PR - zawiera wartość, co ile cykli PCLK następuje inkrementacja w rejestrze TC. Gdy wartość w PC jest równa PR nastepuje inkrementacja w TC i zerowanie PC.
+		\newline \textbullet Rejestr TC - licznik Timera, jest inkrementowany co określoną liczbe cykli. Z tego rejestru pobieramy czas
+		\newline \textbullet Rejestr MR0 - jeśli wartość z TC jest równa MR0 wywołane zostaje przerwanie.
+		\newline \textbullet Rejestr MCR - konfiguracja dotycząca przerwań.
+		
+		
+		Podczas inicjalizacji Timer korzysta z dwóch struktur, które przechowują ustawienia:
+		\newline
+		\textbullet Pierwsza stuktura pozwala na ustawienie trybu Timera. Dostepne tryby to tryb absolutny - Timer zlicza "tyknięcia" zegara i zwraca liczbe tyknięć oraz tryb preskalowany - wtedy Timer zwraca wartość w jednostce czasu, oraz wartość preskalowania - 1000 dla milisekund.
+		\newline
+		\textbullet Druga struktura zawiera opcje dotyczące rejestru MCR, takie  jak:
+			\newline \textbullet Wybór kanału dopasowania (od 0 do 3)
+			\newline \textbullet Stwiedzenie, czy po dopasowaniu ma wystąpić przerwanie (ENABLE lub DISABLE)
+			\newline \textbullet Stwierdzenie, czy po dopasowaniu timer ma się zatrzymać (ENABLE lub DISABLE)
+			\newline \textbullet Stwierdzenie, czy po dopasowaniu timer ma się zresetować  
+			\newline \textbullet Wybór, co ma się stać na lini obsługującej przerwania. Możliwości to nierobienie niczego, zmiana stanu na niski, zmiana stanu na wysoki, zmiana stanu w ogóle.
+			
+		 Timer jest inicjalizowany poprzez ustawienie odpowiednich rejestrów. W naszym programie Timer0 jest inicjalizowany następującymi wartościami:
+		\newline \textendash Do rejestru PR wpisanie wartości dotyczącej preskalowania do milisekund (1000)
+		\newline \textendash Do rejestru MR0 czas, po jakim na następować przerwanie
+		\newline \textendash W rejestrze MCR - bit 0 ustawiony na 1 - włączenie przerwań oraz bit 2 ustawiony na 1 - po przerwaniu stop.
+		\newline \textendash Do rejestru EMR - 0 nie rób nic po przerwaniu.
+		\newline \textendash Końcową fazą inicjalizacji jest ustawienie w rejestrze TCR na 0 bicie wartości 1. Implikuje to restart Timera.	
+		\newline Inicjalizacja Timer'a1 jest bardzo podobna do inicjalizacji wcześniejszego. Różnicą jest, że w tym przypadku timer nie korzysta z przerwań. Zatem w rejestrze MCR ustawione zostanie 0. Reszta operacji przebiega tak samo jak podczas inicjalizacji Timer0.
+		\newline \newline
+		Zczytanie wartości z Timer1 sprowadza się do odczytania wartości rejestru TC.
 		
 		\subsection{OLED}
+		Wyświetlacz OLED, z którego korzystamy to OEL Display Module, model UG-9664HSWAG01. 
+		Podstawowa Specyfikacja:
+		\newline \textendash Rozdzielczość:  $96\times 64$
+		\newline \textendash Kolor wyświetlacza: Monochromatyczny (biały)
+		
+		Inicjalizacja wyświetlacza rozpoczyna się od ustawienia kierunku wyjścia na portach GPIO nr 2 i 0.
+		
+		
+		 \begin{tabular}{|c|c|c|}
+		 	\hline 
+		 	\textbf{Nr portu} & \textbf{Bity, których kierunek ustawiamy} & \textbf{Kierunek}  \\ 
+		 	\hline 
+		 	2 & bit 1 & Wyjście \\ 
+		 	\hline 
+		 	2 & bit 7 & Wyjście  \\ 
+		 	\hline 
+		 	0 & bit 6 & Wyjście \\
+		 	\hline
+		 	 \end{tabular} 
+		 	
+		 	Następnie należy upewnić się, że zasilanie wyświetlacza jest wyłączone poprzez wyczyszczenie bitu 1 na porcie nr 2 GPIO. Z punktu widzenia wyświetlacza, realizowane jest to przez pin MPU nr 9. Gdy sygnał na tym pinie jest niski, realizowany jest reset zasilania wyświetlacza. \cite{SAS1-6020-A}
+		 	
+		 	Kolejny krokiem jest sekwencja poleceń rekomendowanych do wykonania przez producenta urządzenia. Odbywa się to przez interfejs SSP. Adres wyświetlacza OLED w interfejsie SSP wynosi $($0x40000000UL$)$ $+$  $($0x30000$)$.
+		 	Ostatnim punktem inicjalizacji wyświetlacza jest już włączenie zasilania. Odbywa się to poprzez wstawienie 1 na bicie nr. 1 na porcie nr. 2 GPIO.
+		 	
+		 	
+		 	Wyświetlenie obiektu na ekranie sprowadza się do zamalowania kolorem przeciwnym do tła pikseli. Przesyłanie informacji, który piksel ma zostać zamalowany odbywa się za pomocą interfejsu SPI. Minimalna wartość do przesłania to 8 bitów. Wysłanie jednego piksela w ten sposób powoduje, że należy pozostałe 7 ustawić na czarno. Z tego powodu wysyłanie na ekran jest wolniejsze i powiązane z szybkością magistrali SSP.
+		 	
+		 	Wysyłanie pikselu na ekran rozpoczyna się od ustalenia, w której stronie znajduje się punkt. Należy również obliczyć dolny oraz górny adres kolumny oraz wartość maski, która to jest resztą z dzielenia składowej y piksela przez 8. Maska jest pozycją bitu, na której znajduje się piksel który ma zostać zamalowany na biało. Kolejnym krokiem jest wysłanie przez SSP numery strony, dolnego i górnego adresu kolumny. Ostatecznie przez SSP wysyłane są bity z informacją, który piksel zamalować. 
+		 	
+			
+			
+			
+		
 		
 		\subsection{SSP/SPI}
+		SPI (Serial Peripheral Interface ) \textendash to szeregowy interfejs urządzeń peryferyjnych, umożliwiający komunikację między mikroprocesorem a urządzeniami peryferyjnymi. Umożliwia synchroniczną, szeregową, pełnodupleksową komunikację oraz programowalną długość przesyłanych danych.
+		Płytka wyposażona jest również w dwa kontrolery SSP (Synchronous Serial Port ), SSP0 i SSP1 – kontrolery umożliwiające operacje na SPI, SSI oraz magistrali Microwire. Posiadają one kolejkowanie FIFO, obsługę 	wielu protokołów oraz możliwość używania z wykorzystaniem General Purpose DMA.
+		
+		Interfejs SPI znajduję się w LPC1768/9, jednak jest to przestarzałe rozwiązanie. Jest on zaimplementowany w urządzeniu, by łatwiej przenieść oprogoramowanie ze starszych modeli, które nie miały możliwości użycia SSP. Jako, że interfejs SSP jest nowszym i bardziej wszechstronnym rozwiązaniem, skorzystaliśmy właśnie z niego, co również zaleca dokumentacja. W projekcie wykorzystujemy jeden z dwóch interfejsów - SPP1. Jego adres bazowy to 0x4003 0000, jest podłączony do slave group 0 (APB0).
+		
+		 	Komunikacja w trybia SPI odbywa się synchronicznie za pomocą czterech lini:
+		 \textbullet MOSI (Master Output Slave Input) \textendash dane wysyłane do urządzenia peryferyjnego
+		 \textbullet MISO (Master Input Slave Output) \textendash odczyt danych z urządzenia peryferyjnego 
+		 \textbullet SCLK (Serial CLocK) - sygnał zegarowy zapewniający synchroniczność
+		 \textbullet SS (Slave Select) - służy do wyboru urządzenia peryferyjnego
+		 
+		 Co prawda możliwa jest obsługa wielu połączeń master-slave, jednak tylko jeden master i tylko jeden slave mogą się komunikować podczas przesyłania danych. Przesył danych przebiega w trybie full-duplex, wykorzystywane są ramki o długości 8 lub 16 bitów. 
+		 
+		 Inicjalizację zasilania zapewnia rejestr PCONP. By zasilić SSP1 należy ustawić w tym rejestrze bit o nr. 10 na wartość 1. Następuje konfiguracja SSP, ustawienie bitów rejestrów CR0 i CR1.
+		 
+		 \begin{center}
+		 	Tabela przedstawiająca konfiguracje na rejestrze CR0
+		 
+		 
+		 \begin{tabular}{|c|c|c|c|c|}
+		 	\hline 
+		 Bit 3:0  & Bit 5:3  & Bit 6  & Bit 7  &  \\ 
+		 	\hline 
+		 DSS & FRF  & CPOL  & CPHA & SCR \\ 
+		 	\hline 
+		 \end{tabular} 
+	 \end{center}
+	 
+	 
+	 \textbullet DSS  - określenie rozmiaru danych w ramce
+	 \textbullet FRF  - tryb pracy
+	 \textbullet CPOL - wybór polaryzacji sygnału
+	 \textbullet CPHA - wybór fazy próbkowania
+	 \textbullet SCR  - podzielnik sygnału preskalera, pozwala określić prędkość transmisji 
+		  
+			 
+		\begin{center}
+			Tabela przedstawiająca konfiguracje na rejestrze CR0
+			
+			
+			\begin{tabular}{|c|c|c|c|}
+				\hline 
+				Bit 0  & Bit 1  & Bit 2  & Bit 3  \\ 
+				\hline 
+				LBM & SSE  & MS  & SOD \\ 
+				\hline 
+			\end{tabular} 
+		\end{center}
+	
+	\textbullet LBM - ustawienie do debugowania
+	\textbullet SSE - włączenie SSP
+	\textbullet MS  - określenie trybu pracy. 0 dla master, 1 dla slave
+	\textbullet SOD - dla 1 występuje blokada mastera do wysyłania danych linią MISO
+	
+	
+	Aby poprawnie przesyłać dane należy określić prędkość transmisji, poprzes ustawienie jej w rejestrze CPSR (Clock Prescale Register).
+	
+	
+	Po zainicjalizowaniu, aby rozpocząć przesyłanie danych, należy je przesłać do rejestru danych DR (jeśli bit TNF w rejestrze statusu SR jest ustawiony). Jeżeli bit BSY w rejestrze SR jest ustawiony na 0, co oznacza, że kontroler nie jest zajęty, rozpoczyna się nadawanie.
 		
 		\subsection{Czujnik światła}
-Czujnik światła jest urządzeniem peryferyjnym przyłączonym do płytki magistralą I\textsuperscript2C. Program wkorzystuje odczytane natężenie światła do odwrócenia kolorów na 			wyświetlaczu w momencie w którym odczytana wartość natężenia światła będzie mniejsza niż 25 luksów. Uruchomienie czujnika światła polega na przesłaniu przez	
-I2C pod adres (0x44) kolejno wartości (0x00) oraz (1<<7) . To powoduje ustawienie wartości 1 na 7 bicie rejestru Command Register(0x00) i w konsekwencji 	uruchomienie przetwornika analogowo-cyfrowego w czujniku. Zakres odczytu czujnika jest domyślny i wynosi od 0 do 1000 luksów. Odczyt wartości pomiaru czujnika wymaga 				odczytania zawartości dwóch rejestrów:  LSB-Sensor - zawiera dolny bajt ostatniego odczytu sensora(adres 0x04), MSB-Sensor - zawiera górny bajt ostatniego odczytu 					sensora(adres 0x05).
+Czujnik światła jest urządzeniem peryferyjnym przyłączonym do płytki magistralą I\textsuperscript2C. Program wkorzystuje odczytane natężenie światła do odwrócenia kolorów na 			wyświetlaczu w momencie w którym odczytana wartość natężenia światła będzie mniejsza niż 25 luksów. Uruchomienie czyjnika światła polega na przesłaniu przez	
+I2C pod adres (0x44) kolejno wartości (0x00) oraz (1<<7) . To powoduje ustawienie wartości 1 na 7 bicie rejestru Command Register(0x00) i w konsekwencji 	uruchomienie przetwornika analogowo-cyfrowego w czujniku. Zakres odczytu czujnika jest domyślny i wynosi od 0 do 1000 luksów. Odczyt wartości pomiaru czujnika wymaga 				odczytania zawartości dwóch rejestrów:  LSB-Sensor - zawiera dolny bajt ostatniego odczytu sensora(adres 0x04), MSB-Sensor - zawiera górny bajt ostatniego odczytu 					sensora(adres 0x05). Wynik wyrażony w luksach jest obliczany z następującego wzoru: E = 973 * odczytana-wartość /  (1<<16)
 \subsection{PCA9532}
 Expander PCA9532 wyposażony w 16 diód LED jest wkorzystywany do reprezentacji wyniku w danym momencie gry. Zapalone diody przedstawiają wynik w postaci binarnej.
 W celu zapalenia odpowiednich diód należy ustalić 16 bitową maskie w której wartości 1 oznaczają zapaloną diodę. Następnie przez I2C pod adres rejestru kontrolnego(0x60)  				zostaje wysłany bajt kontrolny. Trzeci  bit bajtu kontorlnego onacza flagę inkrementacji która zwiększa o 1 adres podany w pozostałych 4 bitach po każdym przesłanym bajcie. 				Potem przesłane zostają 4 bajty które zostają kolejno wpisane do 4  8-bitowych rejestrów(LS0,LS1,LS2,LS3) w których każde 2 bity odpowiadają jednej diodzie. Program korzysta 				jedynie ze stanów OFF(00) oraz ON(01).
 \subsection{I\textsuperscript{2}C}
 I2C (Inter-Integrated Circuit) to szeregowa, dwukierunkowa magistrala do przesyłania danych. Program wykorzystuje ją do komunikacji z PCA9532, czujnikiem światła oraz 					akcelerometrem.
-Początek inicjalizacji magistrali zaczyna się od konfiguracji pinów które będą pełniły fukcjię lini SCL(linia zegara) i SDA(linia danych). Dla interfejsu I2C2 są one ustawione 				odpowiednio na pinach P0[11] oraz P0[10]. W tym celu ustawiamy w rejestrze PINSEL0 wartosci 1 i 0 kolejno dla bitów 21 i 20(P0.10 SDA2) oraz wartość 1 i 0 dla bitów 23 i 22(P0.11 		SCL2). Następnie następuje włączenie zasilania dla I2C poprzez ustawienie wartości 1 na 26 bicie rejestru PCONP(Power Control for Peripherals Register). Ustawiamy dzielnik zegara 			PCLK na 2 ustawiając w rejestrze PCLKSEL 20 i 21 bit na wartości kolejno 0 i 1. Następnie należy ustawić wartość rejestrów I2SCLH i I2SCLL na żądaną ilość cykli zegara PCLK. Obie			 	te wartości są sobie równe.
-Następnie występuje ustawienie na wartość 1 bitów 2(flaga AA), 5(flaga STA) i 6(flaga I2EN) rejestru CONCLR.
+Początek inicjalizacji magistrali zaczyna się od konfiguracji pinów które będą pełniły fukcjię lini SCL(linia zegara) i SDA(linia danych). Dla interfejsu I2C2 są one ustawione 				odpowiednio na pinach P0[11] oraz P0[10]. W tym celu ustawiamy w rejestrze PINSEL0 wartosci 1 i 0 kolejno dla bitów 21 i 20(P0.10 SDA2) oraz wartość 1 i 0 dla bitów 23 i 22(P0.11 		SCL). Następnie następuje włączenie zasilania dla I2C poprzez ustawienie wartości 1 na 26 bicie rejestru PCONP(Power Control for Peripherals Register). Ustawiamy dzielnik zegara 			PCLK na 2 ustawiając w rejestrze PCLKSEL 20 i 21 bit na wartości kolejno 0 i 1. Następnie należy ustawić wartość rejestrów I2SCLH i I2SCLL na żądaną ilość cykli zegara PCLK. Obie			 	te wartości są sobie równe.(...)
+ 
+Na koniec występuje ustawienie na wartość 1 bitów 2(flaga AA), 5(flaga STA) i 6(flaga I2EN) rejestru CONCLR.
 Na koniec należy w rejestrze I2CONSET ustawiamy wartość 1 na 6 bicie aby włączyć interfejs I2C2. 
 \subsection{Rotacyjny przełącznik kwadraturowy}
-Rotacyjny przełącznik kwadraturowy jest wykorzystywany w naszym programie do regulacji prędkości poruszania się "węża". Obrót przełącznika w prawo zmniejsza prędkość, a obór w lewo zwiększa. Inicjalizacja ogranicza się do ustawienia na porcie 0 GPIO wartości 0 na 24 i 25 bicie rejestru FIODIR(zerowy i pierwszy bit rejestru FIO0DIR3). Wartość 0 oznacza że pin jest ustawiony na wejście. Program odczytuje inforamcję o 4 stanach(są ustalone na podstawie położenia przełącznika). Wartości są odczytywane z portu FIO0PIN3. W zależności od kolejności występowania stanów ustalany jest kierunek ruchu przełącznika.
+Rotacyjny przełącznik kwadraturowy jest wykorzystywany w naszym programie do regulacji prędkości poruszania się "węża". Obrót przełącznika w prawo zmniejsza prędkość, a obór w lewo zwiększa. Inicjalizacja ogranicza się do ustawienia na porcie 0 GPIO wartości 0 na 24 i 25 bicie rejestru FIODIR(zerowy i pierwszy bit rejestru FIO0DIR3). Wartość 0 oznacza że pin jest ustawiony na wejście. Program odczytuje inforamcję o 4 stanach(są ustalone na podstawie położenia przełącznika). W zależności od kolejności występowania stanów ustalany jest kierunek ruchu przełącznika.
 	\section{Analiza FMEA}
+	
 
 	\resizebox{\textwidth}{!}{%
 	\hspace*{-85pt}\begin{tabular}{|c|c|c|c|c|c|}
@@ -307,7 +433,12 @@ Rotacyjny przełącznik kwadraturowy jest wykorzystywany w naszym programie do r
 		Control and Shutdown Mode Datasheet},
 	{December 2002},
 	\textbf{National Semiconductor}
-}		
+}
+		\bibitem{SAS1-6020-A}{
+		\textit{OEL Display Module Product Specification},
+		{September 2006},
+		\textbf{Univision Technology Inc}
+	}			
 \end{thebibliography}
 
 \end{document}
